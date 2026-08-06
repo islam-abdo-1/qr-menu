@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ChevronDown, Heart, Languages, ScanLine, ShoppingBag, Sparkles, UtensilsCrossed } from "lucide-react";
+import { ChevronDown, Heart, Languages, LogOut, ScanLine, ShoppingBag, Sparkles, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
 import type { MenuData } from "@/lib/data";
@@ -108,7 +108,7 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
   /* ───── التفضيلات ───── */
   const [favItems, setFavItems] = useState<FavoriteItem[]>([]);
   const [authOpen, setAuthOpen] = useState(false);
-  const favIds = useRef<Set<string>>(new Set());
+  const [favIds, setFavIds] = useState<Set<string>>(new Set());
   const pendingFav = useRef<string | null>(null);
 
   useEffect(() => {
@@ -116,7 +116,7 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
     getFavoriteItemsAction().then((res) => {
       if (cancelled || !res.ok) return;
       setFavItems(res.data);
-      favIds.current = new Set(res.data.map((f) => f.id));
+      setFavIds(new Set(res.data.map((f) => f.id)));
     });
     return () => {
       cancelled = true;
@@ -127,7 +127,7 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
     const res = await getFavoriteItemsAction();
     if (!res.ok) return;
     setFavItems(res.data);
-    favIds.current = new Set(res.data.map((f) => f.id));
+    setFavIds(new Set(res.data.map((f) => f.id)));
   }, []);
 
   const handleToggleFavorite = useCallback(
@@ -140,8 +140,12 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
         }
         return;
       }
-      if (res.data.favorite) favIds.current.add(itemId);
-      else favIds.current.delete(itemId);
+      setFavIds((prev) => {
+        const next = new Set(prev);
+        if (res.data.favorite) next.add(itemId);
+        else next.delete(itemId);
+        return next;
+      });
       await refreshFavorites();
     },
     [refreshFavorites],
@@ -153,14 +157,26 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
       pendingFav.current = null;
       await toggleFavoriteAction(id);
     }
-    await refreshFavorites();
+    // الجلسة الجديدة قد لا تنتشر في الكوكيز فورًا — أعد المحاولة حتى تظهر القائمة
+    for (let i = 0; i < 4; i++) {
+      await refreshFavorites();
+      await new Promise((r) => setTimeout(r, 700));
+    }
   }, [refreshFavorites]);
 
   const signOut = useCallback(async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
     setFavItems([]);
-    favIds.current = new Set();
+    setFavIds(new Set());
+  }, []);
+
+  const jumpFav = useCallback(() => {
+    const el = document.getElementById("favorites");
+    if (el) {
+      const y = el.getBoundingClientRect().top + window.scrollY - 96;
+      window.scrollTo({ top: y, behavior: "smooth" });
+    }
   }, []);
 
   useEffect(() => {
@@ -211,8 +227,8 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
           }}
           aria-hidden
         />
-        <div className="pointer-events-none absolute -end-24 -top-24 h-72 w-72 animate-float rounded-full bg-gold/15 blur-3xl" aria-hidden />
-        <div className="pointer-events-none absolute -start-24 bottom-0 h-72 w-72 rounded-full bg-primary/15 blur-3xl" aria-hidden />
+        <div className="pointer-events-none absolute -end-24 -top-24 hidden h-72 w-72 animate-float rounded-full bg-gold/15 blur-3xl sm:block" aria-hidden />
+        <div className="pointer-events-none absolute -start-24 bottom-0 hidden h-72 w-72 rounded-full bg-primary/15 blur-3xl sm:block" aria-hidden />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background to-transparent" aria-hidden />
 
         <div className="container relative flex min-h-[78vh] flex-col items-center justify-center gap-6 py-20 text-center sm:min-h-[70vh]">
@@ -340,11 +356,11 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
               {favItems.length > 0 ? (
                 <button
                   type="button"
-                  onClick={signOut}
-                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-3.5 py-1.5 text-xs font-black text-gold transition-colors hover:bg-gold/20"
-                  title={locale === "ar" ? "تسجيل الخروج" : "Sign out"}
+                  onClick={jumpFav}
+                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#EF4444]/40 bg-[#EF4444]/10 px-3.5 py-1.5 text-xs font-black text-[#EF4444] transition-colors hover:bg-[#EF4444]/20"
+                  title={locale === "ar" ? "مفضلتي" : "My favorites"}
                 >
-                  <Heart className="h-3.5 w-3.5 fill-gold" />
+                  <Heart className="h-3.5 w-3.5 fill-[#EF4444]" />
                   {favItems.length}
                 </button>
               ) : null}
@@ -362,10 +378,18 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
                 transition={{ duration: 0.5 }}
               >
                 <h2 className="font-display flex items-center justify-center gap-3 text-4xl font-bold text-gold-gradient drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)] sm:text-5xl">
-                  <Heart className="h-9 w-9 fill-gold text-gold" />
+                  <Heart className="h-9 w-9 fill-[#EF4444] text-[#EF4444]" />
                   {locale === "ar" ? "مفضلتي" : "My Favorites"}
                 </h2>
                 <Ornament className="mt-4 text-gold" />
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-3 py-1.5 text-[11px] font-bold text-cream/55 transition-colors hover:border-destructive/40 hover:text-destructive"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  {locale === "ar" ? "تسجيل الخروج" : "Sign out"}
+                </button>
               </motion.div>
 
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -436,7 +460,7 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
                       index={itemIndex}
                       delay={index * 0.02}
                       themePrimary={themePrimary}
-                      favorite={favIds.current.has(item.id)}
+                      favorite={favIds.has(item.id)}
                       onToggleFavorite={() => handleToggleFavorite(item.id)}
                       qtyInCart={cartQtyOf(item.id)}
                       onAdd={() =>

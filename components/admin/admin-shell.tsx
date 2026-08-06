@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -18,6 +18,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { signOutAction } from "@/lib/actions/auth";
+import { getOrdersAction, type OrderView } from "@/lib/actions/orders";
+import { playOrderBeep, flashTitle } from "@/lib/notify";
 import { ItemsPanel } from "@/components/admin/items-panel";
 import { CategoriesPanel } from "@/components/admin/categories-panel";
 import { SettingsPanel } from "@/components/admin/settings-panel";
@@ -38,6 +40,42 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 export function AdminShell({ data }: { data: AdminData }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("items");
+
+  /* ───── مراقبة الطلبات (تنبيه الطلب الجديد) ───── */
+  const [orders, setOrders] = useState<OrderView[] | null>(null);
+  const [newBadge, setNewBadge] = useState(0);
+  const knownNewIds = useRef<Set<string>>(new Set());
+  const firstLoad = useRef(true);
+
+  const pollOrders = useCallback(async () => {
+    const res = await getOrdersAction();
+    if (!res.ok) return;
+    setOrders(res.data);
+    const newIds = new Set(res.data.filter((o) => o.status === "new").map((o) => o.id));
+    if (!firstLoad.current) {
+      const fresh = res.data.filter(
+        (o) => o.status === "new" && !knownNewIds.current.has(o.id),
+      );
+      if (fresh.length > 0) {
+        playOrderBeep();
+        flashTitle("🔔 طلب جديد!");
+        fresh.forEach((o) => {
+          toast.info(`طلب جديد — رقم ${o.number}`, {
+            description: `${o.customerName}${o.tableNo ? ` — طاولة ${o.tableNo}` : ""}`,
+          });
+        });
+      }
+    }
+    firstLoad.current = false;
+    knownNewIds.current = newIds;
+    setNewBadge(newIds.size);
+  }, []);
+
+  useEffect(() => {
+    pollOrders();
+    const t = setInterval(pollOrders, 15_000);
+    return () => clearInterval(t);
+  }, [pollOrders]);
 
   const menuPath = `/m/${data.restaurant.slug}`;
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
@@ -62,7 +100,10 @@ export function AdminShell({ data }: { data: AdminData }) {
     }
   }
 
-  const onChanged = () => router.refresh();
+  const onChanged = () => {
+    router.refresh();
+    pollOrders();
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-background lg:flex-row">
@@ -113,6 +154,11 @@ export function AdminShell({ data }: { data: AdminData }) {
               >
                 <Icon className="h-4 w-4" />
                 {t.label}
+                {t.id === "orders" && newBadge > 0 && tab !== "orders" ? (
+                  <span className="ms-auto flex h-5 min-w-5 animate-pulse items-center justify-center rounded-full bg-[#EF4444] px-1.5 text-[10px] font-black text-white">
+                    {newBadge}
+                  </span>
+                ) : null}
                 {isActive ? (
                   <span className="ms-auto hidden h-1.5 w-1.5 rounded-full bg-background/70 lg:block" />
                 ) : null}
@@ -169,7 +215,7 @@ export function AdminShell({ data }: { data: AdminData }) {
             </div>
           </div>
 
-          {tab === "orders" && <OrdersPanel onChanged={onChanged} />}
+          {tab === "orders" && <OrdersPanel orders={orders} onChanged={onChanged} />}
           {tab === "items" && <ItemsPanel data={data} onChanged={onChanged} />}
           {tab === "categories" && <CategoriesPanel data={data} onChanged={onChanged} />}
           {tab === "settings" && <SettingsPanel settings={data.settings} onSaved={onChanged} />}

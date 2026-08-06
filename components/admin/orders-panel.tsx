@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2, Phone, MapPin, MessageSquare, Clock3, Store, Bike } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
-import { getOrdersAction, updateOrderStatusAction, type OrderStatus, type OrderView } from "@/lib/actions/orders";
+import { updateOrderStatusAction, type OrderStatus, type OrderView } from "@/lib/actions/orders";
 
 const STATUS_META: Record<OrderStatus, { label: string; next: OrderStatus | null; cls: string }> = {
   new: { label: "جديد", next: "preparing", cls: "bg-gold/15 text-gold border-gold/30" },
@@ -13,19 +13,14 @@ const STATUS_META: Record<OrderStatus, { label: string; next: OrderStatus | null
   done: { label: "تم التسليم", next: null, cls: "bg-cream/10 text-cream/60 border-border" },
 };
 
-export function OrdersPanel({ onChanged }: { onChanged: () => void }) {
-  const [orders, setOrders] = useState<OrderView[] | null>(null);
+export function OrdersPanel({
+  orders,
+  onChanged,
+}: {
+  orders: OrderView[] | null;
+  onChanged: () => void;
+}) {
   const [busy, setBusy] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    const res = await getOrdersAction();
-    if (res.ok) setOrders(res.data);
-    else toast.error(res.error);
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   async function advance(orderId: string, status: OrderStatus) {
     setBusy(orderId);
@@ -35,7 +30,6 @@ export function OrdersPanel({ onChanged }: { onChanged: () => void }) {
       toast.error(res.error);
       return;
     }
-    await load();
     onChanged();
   }
 

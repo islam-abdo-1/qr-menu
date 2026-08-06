@@ -75,12 +75,12 @@ export function ItemCard({
             className={cn(
               "absolute top-3 flex h-9 w-9 items-center justify-center rounded-full border backdrop-blur transition-all active:scale-90",
               favorite
-                ? "border-gold/60 bg-gold/25 text-gold"
-                : "border-border bg-black/50 text-cream/70 hover:border-gold/40 hover:text-gold",
+                ? "border-[#EF4444]/70 bg-[#EF4444]/25 text-[#EF4444] shadow-[0_0_16px_-4px_rgba(239,68,68,0.7)]"
+                : "border-border bg-black/50 text-cream/70 hover:border-[#EF4444]/50 hover:text-[#EF4444]",
             )}
             style={{ insetInlineEnd: "0.75rem" }}
           >
-            <Heart className={cn("h-4 w-4", favorite && "fill-gold")} />
+            <Heart className={cn("h-4 w-4", favorite && "fill-[#EF4444]")} />
           </button>
         ) : null}
         {/* شارة السعر */}

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Amiri, Cairo, Cormorant_Garamond } from "next/font/google";
+import { Amiri, Cairo } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -8,7 +8,7 @@ export const revalidate = 300;
 const cairo = Cairo({
   subsets: ["arabic", "latin"],
   variable: "--font-cairo",
-  weight: ["400", "500", "600", "700", "800", "900"],
+  weight: ["400", "500", "600", "700", "900"],
   display: "swap",
 });
 
@@ -16,13 +16,6 @@ const amiri = Amiri({
   subsets: ["arabic", "latin"],
   variable: "--font-display",
   weight: ["400", "700"],
-  display: "swap",
-});
-
-const cormorant = Cormorant_Garamond({
-  subsets: ["latin"],
-  variable: "--font-serif",
-  weight: ["500", "600", "700"],
   display: "swap",
 });
 
@@ -46,7 +39,7 @@ export default function RootLayout({
     <html
       lang="ar"
       dir="rtl"
-      className={`${cairo.variable} ${amiri.variable} ${cormorant.variable}`}
+      className={`${cairo.variable} ${amiri.variable}`}
     >
       <body className="min-h-screen">
         {children}

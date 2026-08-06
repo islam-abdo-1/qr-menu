@@ -59,7 +59,7 @@ export function Landing({ lang = "ar" }: { lang?: Lang }) {
           }}
           aria-hidden
         />
-        <div className="pointer-events-none absolute -end-24 -top-24 h-72 w-72 animate-float rounded-full bg-gold/15 blur-3xl" aria-hidden />
+        <div className="pointer-events-none absolute -end-24 -top-24 hidden h-72 w-72 animate-float rounded-full bg-gold/15 blur-3xl sm:block" aria-hidden />
         <div className="pointer-events-none absolute -start-24 bottom-0 h-72 w-72 rounded-full bg-primary/15 blur-3xl" aria-hidden />
 
         <div className="container relative flex min-h-[100svh] flex-col items-center justify-center gap-7 py-24 text-center">

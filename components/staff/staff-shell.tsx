@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
+import { playOrderBeep, flashTitle } from "@/lib/notify";
 import {
   getStaffOrdersAction,
   getStaffRestaurantsAction,
@@ -46,11 +47,35 @@ export function StaffShell() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginBusy, setLoginBusy] = useState(false);
 
+  const knownNewIds = useRef<Set<string>>(new Set());
+  const firstLoad = useRef(true);
+
   const loadOrders = useCallback(async () => {
     const res = await getStaffOrdersAction();
     if (!res.ok) return false;
     setRestaurantName(res.data.restaurantName);
     setOrders(res.data.orders);
+
+    // تنبيه عند وصول طلب جديد (بعد التحميل الأول فقط)
+    const newIds = new Set(
+      res.data.orders.filter((o) => o.status === "new").map((o) => o.id),
+    );
+    if (!firstLoad.current) {
+      const fresh = res.data.orders.filter(
+        (o) => o.status === "new" && !knownNewIds.current.has(o.id),
+      );
+      if (fresh.length > 0) {
+        playOrderBeep();
+        flashTitle("🔔 طلب جديد!");
+        fresh.forEach((o) => {
+          toast.info(`طلب جديد — رقم ${o.number}`, {
+            description: `${o.customerName}${o.tableNo ? ` — طاولة ${o.tableNo}` : ""}`,
+          });
+        });
+      }
+    }
+    firstLoad.current = false;
+    knownNewIds.current = newIds;
     return true;
   }, []);
 
@@ -95,6 +120,8 @@ export function StaffShell() {
     setRestaurantName(null);
     setOrders(null);
     setPin("");
+    firstLoad.current = true;
+    knownNewIds.current = new Set();
     getStaffRestaurantsAction().then((r) => {
       if (r.ok) setRestaurants(r.data);
     });
@@ -205,8 +232,14 @@ export function StaffShell() {
               {restaurantName}
               {newCount > 0 ? (
                 <span className="flex items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-black text-gold">
-                  <Bell className="h-3 w-3" />
+                  <Bell className="h-3 w-3 animate-pulse" />
                   {newCount} جديد
+                </span>
+              ) : null}
+              {newCount > 0 ? (
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#EF4444] opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#EF4444]" />
                 </span>
               ) : null}
             </h1>
