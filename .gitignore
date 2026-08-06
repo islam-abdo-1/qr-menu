@@ -38,3 +38,7 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# dev junk
+*.log
+reffter-js.js
