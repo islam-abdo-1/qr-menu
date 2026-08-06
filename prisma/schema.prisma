@@ -1,0 +1,40 @@
+// Prisma Schema — QR Menu (Supabase PostgreSQL / Vercel)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Setting {
+  id              Int      @id @default(autoincrement())
+  restaurantName  String   @default("مطعمي")
+  currency        String   @default("EGP")
+  themePrimary    String   @default("#C84C21")
+  logoUrl         String?  @default("")
+  createdAt       DateTime @default(now())
+}
+
+model Category {
+  id        String     @id @default(uuid())
+  name      String
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  items     MenuItem[]
+}
+
+model MenuItem {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  imageUrl    String?
+  isAvailable Boolean   @default(true)
+  categoryId  String
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+}

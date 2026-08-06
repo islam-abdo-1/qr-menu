@@ -2,26 +2,101 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+    /* ── Dark Luxe (Gold × Black) ─────────────── */
+    --background: 20 16 13; /* #14100D */
+    --foreground: 245 239 228; /* #F5EFE4 */
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+    --card: 34 27 22; /* #221B16 */
+    --card-foreground: 245 239 228;
+
+    --popover: 30 24 19; /* #1E1813 */
+    --popover-foreground: 245 239 228;
+
+    --primary: 212 168 83; /* #D4A853 gold */
+    --primary-foreground: 20 16 13;
+
+    --secondary: 212 168 83; /* #D4A853 gold */
+    --secondary-foreground: 20 16 13;
+
+    --muted: 45 37 30; /* #2D251E */
+    --muted-foreground: 172 155 138; /* #AC9B8A */
+
+    --accent: 47 39 32; /* #2F2720 */
+    --accent-foreground: 245 239 228;
+
+    --ember: 214 81 31; /* #D6511F */
+
+    --destructive: 214 81 81;
+    --destructive-foreground: 255 255 255;
+
+    --border: 66 54 42; /* #42362A */
+    --input: 66 54 42;
+    --ring: 212 168 83;
+
+    --radius: 0.875rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background font-cairo text-foreground antialiased;
+  }
+
+  ::selection {
+    background: rgb(200 76 33 / 0.18);
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  /* نقشة نقط ناعم للخلفيات الفاخرة */
+  .texture-dots {
+    background-image: radial-gradient(rgba(212, 168, 83, 0.14) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .texture-dots-light {
+    background-image: radial-gradient(rgba(245, 239, 228, 0.08) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
+  /* نص بتدرّج ذهبي — مع fallback صريح حتى لا يختفي النص في المتصفحات غير الداعمة */
+  .text-gold-gradient {
+    color: #d4a853;
+    background: linear-gradient(120deg, #f2d589, #d4a853 45%, #b8862e 85%);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+  @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+    .text-gold-gradient {
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+    }
+  }
+  /* هيكل عظمي أثناء التحميل */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(243, 238, 226, 0.6) 25%,
+      rgba(255, 255, 255, 0.9) 50%,
+      rgba(243, 238, 226, 0.6) 75%
+    );
+    background-size: 800px 100%;
   }
 }

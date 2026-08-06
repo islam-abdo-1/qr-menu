@@ -1,0 +1,143 @@
+{
+  "exportedAt": "2026-08-06T20:28:59.521Z",
+  "counts": {
+    "settings": 1,
+    "categories": 5,
+    "items": 9
+  },
+  "images": [],
+  "settings": [
+    {
+      "id": 1,
+      "restaurantName": "كافي أبو القوة",
+      "currency": "EGP",
+      "themePrimary": "#1F4E5F",
+      "logoUrl": "https://chczpvevpfqiyvfwjbro.supabase.co/storage/v1/object/public/menu-images/logo/951a3767-05cb-4045-a3b6-c365913b4bda.webp",
+      "createdAt": "2026-08-04T00:00:54.995Z"
+    }
+  ],
+  "categories": [
+    {
+      "id": "82f2f63b-fe36-4f0a-9196-15be1eb88213",
+      "name": "حلويات",
+      "sortOrder": 0,
+      "createdAt": "2026-08-04T00:00:57.339Z"
+    },
+    {
+      "id": "45cfda3b-1913-40d4-9542-5f89904688a6",
+      "name": "مشويات",
+      "sortOrder": 1,
+      "createdAt": "2026-08-04T00:00:55.331Z"
+    },
+    {
+      "id": "99585581-9e28-44e9-b80c-66806437396e",
+      "name": "أطباق رئيسية",
+      "sortOrder": 2,
+      "createdAt": "2026-08-04T00:00:56.558Z"
+    },
+    {
+      "id": "d3baf8b2-46df-457e-bccc-bf8604f1a8ba",
+      "name": "مقبلات",
+      "sortOrder": 3,
+      "createdAt": "2026-08-04T00:00:55.944Z"
+    },
+    {
+      "id": "03af7803-2311-4956-9db0-835181c9948a",
+      "name": "مشروبات",
+      "sortOrder": 5,
+      "createdAt": "2026-08-06T14:35:30.857Z"
+    }
+  ],
+  "items": [
+    {
+      "id": "e24c2580-0936-4181-a5f6-edb23d45f399",
+      "name": "كباب بلدي",
+      "description": "كباب لحم بلدي طازج على الفحم يُقدَّم مع أرز وبقدونس",
+      "price": 180,
+      "imageUrl": "https://chczpvevpfqiyvfwjbro.supabase.co/storage/v1/object/public/menu-images/items/a945d6d2-668b-44e0-b055-e428e1dc6155.webp",
+      "isAvailable": true,
+      "categoryId": "45cfda3b-1913-40d4-9542-5f89904688a6",
+      "createdAt": "2026-08-04T00:00:55.331Z"
+    },
+    {
+      "id": "7f3316fc-d634-4db1-82d4-d9912c2e8cb6",
+      "name": "كفتة لحم",
+      "description": "كفتة مشوية متبَّلة بالبهارات المصرية المشهورة",
+      "price": 150,
+      "imageUrl": "https://chczpvevpfqiyvfwjbro.supabase.co/storage/v1/object/public/menu-images/items/e92010b3-1668-4110-bbba-7be9e448488b.webp",
+      "isAvailable": true,
+      "categoryId": "45cfda3b-1913-40d4-9542-5f89904688a6",
+      "createdAt": "2026-08-04T00:00:55.331Z"
+    },
+    {
+      "id": "09fbe0d2-3a0f-4622-8887-01d3c7ab5ce5",
+      "name": "شيش طاووق",
+      "description": "قطع دجاج متبّلة مشوية مع خضار سوتيه",
+      "price": 160,
+      "imageUrl": null,
+      "isAvailable": false,
+      "categoryId": "45cfda3b-1913-40d4-9542-5f89904688a6",
+      "createdAt": "2026-08-04T00:00:55.331Z"
+    },
+    {
+      "id": "9872ed23-027b-4faa-b91c-eb69f3f33c2d",
+      "name": "فتوش",
+      "description": "خضار طازجة مع خبز محمص وصلصة الليمون",
+      "price": 60,
+      "imageUrl": "https://chczpvevpfqiyvfwjbro.supabase.co/storage/v1/object/public/menu-images/items/c1c002bb-f111-49e1-80ca-064ebef20dab.webp",
+      "isAvailable": true,
+      "categoryId": "d3baf8b2-46df-457e-bccc-bf8604f1a8ba",
+      "createdAt": "2026-08-04T00:00:55.944Z"
+    },
+    {
+      "id": "da7cffec-a2fb-4d69-8373-f6472d4258e1",
+      "name": "متبل",
+      "description": "باذنجان مشوي مع الطحينة والزيت البلدي",
+      "price": 45,
+      "imageUrl": null,
+      "isAvailable": false,
+      "categoryId": "d3baf8b2-46df-457e-bccc-bf8604f1a8ba",
+      "createdAt": "2026-08-04T00:00:55.944Z"
+    },
+    {
+      "id": "d21ae834-54ed-4393-993b-946c313d62ab",
+      "name": "بفتيك مكرونة",
+      "description": "شرائح بفتيك بصلصة الطماطم مع المكرونة",
+      "price": 130,
+      "imageUrl": "https://chczpvevpfqiyvfwjbro.supabase.co/storage/v1/object/public/menu-images/items/989fd32d-c63c-48e7-8be0-fc132b2fbed1.webp",
+      "isAvailable": true,
+      "categoryId": "99585581-9e28-44e9-b80c-66806437396e",
+      "createdAt": "2026-08-04T00:00:56.558Z"
+    },
+    {
+      "id": "19f2b00c-c4c0-4c10-b569-64522919d6fd",
+      "name": "فرخة شواية",
+      "description": "نصف فرخة متبّلة بالليمون والثوم على الشواية",
+      "price": 200,
+      "imageUrl": null,
+      "isAvailable": false,
+      "categoryId": "99585581-9e28-44e9-b80c-66806437396e",
+      "createdAt": "2026-08-04T00:00:56.558Z"
+    },
+    {
+      "id": "ebb2426b-c2c9-40dd-87bd-d81bdb59d518",
+      "name": "كيك",
+      "description": "كيك بالبستاشيو",
+      "price": 80,
+      "imageUrl": "https://chczpvevpfqiyvfwjbro.supabase.co/storage/v1/object/public/menu-images/items/5271621d-bbce-4a5d-883e-13ba59c4ace1.webp",
+      "isAvailable": true,
+      "categoryId": "82f2f63b-fe36-4f0a-9196-15be1eb88213",
+      "createdAt": "2026-08-04T02:33:03.063Z"
+    },
+    {
+      "id": "02a0fc1d-fd7c-4908-8942-60f52b4b60e2",
+      "name": "ميلك شيك",
+      "description": "شوكليت\n....",
+      "price": 120,
+      "imageUrl": "https://chczpvevpfqiyvfwjbro.supabase.co/storage/v1/object/public/menu-images/items/fa45b875-643e-4762-939f-e2df7081a2f1.webp",
+      "isAvailable": true,
+      "categoryId": "03af7803-2311-4956-9db0-835181c9948a",
+      "createdAt": "2026-08-06T14:36:43.050Z"
+    }
+  ]
+}

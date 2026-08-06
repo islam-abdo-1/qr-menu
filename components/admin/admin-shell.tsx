@@ -1,0 +1,173 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import {
+  ExternalLink,
+  LayoutDashboard,
+  LogOut,
+  QrCode,
+  Settings,
+  ShoppingBag,
+  Tags,
+  UtensilsCrossed,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { signOutAction } from "@/lib/actions/auth";
+import { ItemsPanel } from "@/components/admin/items-panel";
+import { CategoriesPanel } from "@/components/admin/categories-panel";
+import { SettingsPanel } from "@/components/admin/settings-panel";
+import { QrPanel } from "@/components/admin/qr-panel";
+import type { AdminData } from "@/components/admin/types";
+
+type Tab = "items" | "categories" | "settings" | "qr";
+
+const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
+  { id: "items", label: "العناصر", icon: ShoppingBag },
+  { id: "categories", label: "الأقسام", icon: Tags },
+  { id: "settings", label: "الإعدادات", icon: Settings },
+  { id: "qr", label: "رمز QR", icon: QrCode },
+];
+
+export function AdminShell({ data }: { data: AdminData }) {
+  const router = useRouter();
+  const [tab, setTab] = useState<Tab>("items");
+
+  const stats = useMemo(() => {
+    const totalItems = data.categories.reduce((n, c) => n + c.items.length, 0);
+    const hidden = data.categories.reduce(
+      (n, c) => n + c.items.filter((i) => !i.isAvailable).length,
+      0,
+    );
+    return { categories: data.categories.length, items: totalItems, hidden };
+  }, [data]);
+
+  async function handleLogout() {
+    const res = await signOutAction();
+    if (res.ok) {
+      router.push("/login");
+      router.refresh();
+    } else {
+      toast.error(res.error);
+    }
+  }
+
+  const onChanged = () => router.refresh();
+
+  return (
+    <div className="flex min-h-screen flex-col bg-background lg:flex-row">
+      {/* ───── الشريط الجانبي ───── */}
+      <aside className="flex flex-col border-b border-gold/15 bg-[#171310] lg:min-h-screen lg:w-72 lg:border-b-0 lg:border-e">
+        <div className="px-6 py-6">
+          <div className="flex items-center gap-3">
+            {data.settings.logoUrl ? (
+              <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl ring-2 ring-gold/60 ring-offset-2 ring-offset-[#171310]">
+                <Image
+                  src={data.settings.logoUrl}
+                  alt="شعار المطعم"
+                  fill
+                  sizes="44px"
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+            ) : (
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-gold to-[#a87a2b] text-background shadow-[0_8px_24px_-8px_rgba(212,168,83,0.6)]">
+                <LayoutDashboard className="h-5 w-5" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="text-sm font-black leading-tight text-cream">لوحة الإدارة</p>
+              <p className="truncate text-xs text-cream/65">
+                {data.settings.restaurantName || "بدون اسم"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <nav className="flex gap-1.5 overflow-x-auto px-4 pb-4 lg:flex-1 lg:flex-col lg:overflow-visible lg:px-3 lg:pb-0">
+          {TABS.map((t) => {
+            const Icon = t.icon;
+            const isActive = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  "flex shrink-0 items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-bold transition-all lg:w-full",
+                  isActive
+                    ? "bg-gradient-to-l from-gold to-[#a87a2b] text-background shadow-[0_6px_20px_-8px_rgba(212,168,83,0.6)]"
+                    : "text-cream/60 hover:bg-gold/10 hover:text-gold",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {t.label}
+                {isActive ? (
+                  <span className="ms-auto hidden h-1.5 w-1.5 rounded-full bg-background/70 lg:block" />
+                ) : null}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="mt-auto flex flex-col gap-2 border-t border-gold/15 p-4">
+          <Button variant="outline" asChild className="justify-start rounded-xl">
+            <a href="/" target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="h-4 w-4 text-gold" />
+              معاينة المنيو العام
+            </a>
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={handleLogout}
+            className="justify-start rounded-xl text-destructive hover:bg-destructive/10"
+          >
+            <LogOut className="h-4 w-4" />
+            تسجيل الخروج
+          </Button>
+        </div>
+      </aside>
+
+      {/* ───── المحتوى ───── */}
+      <main className="min-w-0 flex-1 p-4 sm:p-8">
+        <div className="mx-auto max-w-5xl">
+          {/* الترويسة + الإحصائيات */}
+          <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h1 className="font-display text-4xl font-bold text-gold-gradient">
+                {data.settings.restaurantName || "مطعمك"}
+              </h1>
+              <p className="mt-1.5 flex items-center gap-1.5 text-sm text-cream/65">
+                <UtensilsCrossed className="h-4 w-4 text-gold" />
+                تحكم كامل في المنيو — التعديلات تظهر فورًا في الموقع العام
+              </p>
+            </div>
+            <div className="flex gap-2.5">
+              <div className="rounded-2xl border border-gold/20 bg-card px-5 py-3 text-center shadow-soft">
+                <p className="text-2xl font-black text-gold">{stats.categories}</p>
+                <p className="text-[11px] font-semibold text-cream/65">قسم</p>
+              </div>
+              <div className="rounded-2xl border border-gold/20 bg-card px-5 py-3 text-center shadow-soft">
+                <p className="text-2xl font-black text-gold">{stats.items}</p>
+                <p className="text-[11px] font-semibold text-cream/65">عنصر</p>
+              </div>
+              <div className="rounded-2xl border border-gold/20 bg-card px-5 py-3 text-center shadow-soft">
+                <p className="text-2xl font-black text-cream/60">{stats.hidden}</p>
+                <p className="text-[11px] font-semibold text-cream/65">مخفي</p>
+              </div>
+            </div>
+          </div>
+
+          {tab === "items" && <ItemsPanel data={data} onChanged={onChanged} />}
+          {tab === "categories" && <CategoriesPanel data={data} onChanged={onChanged} />}
+          {tab === "settings" && <SettingsPanel settings={data.settings} onSaved={onChanged} />}
+          {tab === "qr" && <QrPanel restaurantName={data.settings.restaurantName} />}
+        </div>
+      </main>
+    </div>
+  );
+}
