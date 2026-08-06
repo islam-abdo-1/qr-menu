@@ -1,20 +1,15 @@
 import type { Metadata } from "next";
-import { getMenuData } from "@/lib/data";
-import { getDictionary } from "@/lib/i18n/dictionaries";
-import { MenuView } from "@/components/public/menu-view";
-
-export const revalidate = 300;
+import { Landing } from "@/components/public/landing";
 
 export const metadata: Metadata = {
-  title: "Menu — QR Menu",
-  description: "Digital restaurant menu — scan the code and order",
+  title: "Digital menu for your restaurant — QR Menu",
+  description: "Create an online menu with your own link — table QR codes, favorites and order intake",
 };
 
-export default async function PublicMenuEnPage() {
-  const [data, dict] = await Promise.all([getMenuData(), Promise.resolve(getDictionary("en"))]);
+export default function LandingEnPage() {
   return (
     <div dir="ltr" lang="en">
-      <MenuView dict={dict} data={data ?? { settings: null, categories: [] }} locale="en" />
+      <Landing lang="en" />
     </div>
   );
 }

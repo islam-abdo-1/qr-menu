@@ -3,17 +3,28 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ChevronDown, Languages, ScanLine, Sparkles, UtensilsCrossed } from "lucide-react";
+import { ChevronDown, Heart, Languages, ScanLine, Sparkles, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MenuData } from "@/lib/data";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
+import { createClient } from "@/lib/supabase/client";
+import { getFavoriteItemsAction, toggleFavoriteAction } from "@/lib/actions/favorites";
 import { ItemCard } from "@/components/public/item-card";
+import { FavoritesAuth } from "@/components/public/favorites-auth";
 
 type Props = {
   dict: Dictionary;
   data: MenuData;
   locale: "ar" | "en";
   langHref?: string;
+};
+
+type FavoriteItem = {
+  id: string;
+  name: string;
+  price: number;
+  imageUrl: string | null;
+  categoryName: string;
 };
 
 /** فاصل زخرفي: خط — معيّن — خط */
@@ -40,6 +51,64 @@ export function MenuView({ dict, data, locale, langHref }: Props) {
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const categoryKey = categories.map((c) => c.id).join("|");
   const logoUrl = data.settings?.logoUrl ?? null;
+
+  /* ───── التفضيلات ───── */
+  const [favItems, setFavItems] = useState<FavoriteItem[]>([]);
+  const [authOpen, setAuthOpen] = useState(false);
+  const favIds = useRef<Set<string>>(new Set());
+  const pendingFav = useRef<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getFavoriteItemsAction().then((res) => {
+      if (cancelled || !res.ok) return;
+      setFavItems(res.data);
+      favIds.current = new Set(res.data.map((f) => f.id));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const refreshFavorites = useCallback(async () => {
+    const res = await getFavoriteItemsAction();
+    if (!res.ok) return;
+    setFavItems(res.data);
+    favIds.current = new Set(res.data.map((f) => f.id));
+  }, []);
+
+  const handleToggleFavorite = useCallback(
+    async (itemId: string) => {
+      const res = await toggleFavoriteAction(itemId);
+      if (!res.ok) {
+        if (res.error.includes("سجّل")) {
+          pendingFav.current = itemId;
+          setAuthOpen(true);
+        }
+        return;
+      }
+      if (res.data.favorite) favIds.current.add(itemId);
+      else favIds.current.delete(itemId);
+      await refreshFavorites();
+    },
+    [refreshFavorites],
+  );
+
+  const handleAuthed = useCallback(async () => {
+    if (pendingFav.current) {
+      const id = pendingFav.current;
+      pendingFav.current = null;
+      await toggleFavoriteAction(id);
+    }
+    await refreshFavorites();
+  }, [refreshFavorites]);
+
+  const signOut = useCallback(async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setFavItems([]);
+    favIds.current = new Set();
+  }, []);
 
   useEffect(() => {
     if (categories.length === 0) return;
@@ -215,8 +284,61 @@ export function MenuView({ dict, data, locale, langHref }: Props) {
                 <Languages className="h-3.5 w-3.5" />
                 {dict.header.languageShort}
               </Link>
+              {favItems.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-3.5 py-1.5 text-xs font-black text-gold transition-colors hover:bg-gold/20"
+                  title={locale === "ar" ? "تسجيل الخروج" : "Sign out"}
+                >
+                  <Heart className="h-3.5 w-3.5 fill-gold" />
+                  {favItems.length}
+                </button>
+              ) : null}
             </div>
           </nav>
+
+          {/* ───── قسم مفضلتي ───── */}
+          {favItems.length > 0 ? (
+            <section id="favorites" className="container mt-10 max-w-5xl scroll-mt-32">
+              <motion.div
+                className="mb-8 text-center"
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.5 }}
+              >
+                <h2 className="font-display flex items-center justify-center gap-3 text-4xl font-bold text-gold-gradient drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)] sm:text-5xl">
+                  <Heart className="h-9 w-9 fill-gold text-gold" />
+                  {locale === "ar" ? "مفضلتي" : "My Favorites"}
+                </h2>
+                <Ornament className="mt-4 text-gold" />
+              </motion.div>
+
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {favItems.map((f, i) => (
+                  <ItemCard
+                    key={f.id}
+                    item={{
+                      id: f.id,
+                      name: f.name,
+                      description: null,
+                      price: f.price,
+                      imageUrl: f.imageUrl,
+                      isAvailable: true,
+                    }}
+                    currency={currency}
+                    locale={locale}
+                    index={i}
+                    delay={0}
+                    themePrimary={themePrimary}
+                    favorite={true}
+                    onToggleFavorite={() => handleToggleFavorite(f.id)}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {/* ───── الأقسام والعناصر ───── */}
           <div className="container mt-14 max-w-5xl space-y-16 pb-4">
@@ -252,6 +374,8 @@ export function MenuView({ dict, data, locale, langHref }: Props) {
                       index={itemIndex}
                       delay={index * 0.02}
                       themePrimary={themePrimary}
+                      favorite={favIds.current.has(item.id)}
+                      onToggleFavorite={() => handleToggleFavorite(item.id)}
                     />
                   ))}
                 </div>
@@ -260,6 +384,13 @@ export function MenuView({ dict, data, locale, langHref }: Props) {
           </div>
         </>
       )}
+
+      {/* ───── نافذة تسجيل/دخول الزبون ───── */}
+      <FavoritesAuth
+        open={authOpen}
+        onOpenChange={setAuthOpen}
+        onAuthed={handleAuthed}
+      />
 
       {/* ───── الفوتر ───── */}
       <footer className="mt-24 overflow-hidden">

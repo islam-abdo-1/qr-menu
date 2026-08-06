@@ -85,6 +85,49 @@ function createSupabaseAdmin() {
   );
 }
 
+/* ───────────────────────── حساب الزبون (المنيو العام) ───────────────────────── */
+
+/** دخول زبون من قائمة المنيو — بدون أي إعادة توجيه */
+export async function signInCustomerAction(
+  email: string,
+  password: string,
+): Promise<ActionResult<null>> {
+  const parsed = credentialsSchema.safeParse({ email, password });
+  if (!parsed.success) {
+    const { error, fieldErrors } = fromZod(parsed.error);
+    return fail(error, fieldErrors);
+  }
+  try {
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword(parsed.data);
+    if (error) return fail(authErrorMessage(error.message));
+    return ok(null);
+  } catch {
+    return fail("تعذّر الاتصال بخدمة الدخول، حاول لاحقًا");
+  }
+}
+
+/** إنشاء حساب زبون — مجرد حساب تفضيلات، لا يُنشئ مطعمًا */
+export async function signUpCustomerAction(
+  email: string,
+  password: string,
+): Promise<ActionResult<null>> {
+  const parsed = credentialsSchema.safeParse({ email, password });
+  if (!parsed.success) {
+    const { error, fieldErrors } = fromZod(parsed.error);
+    return fail(error, fieldErrors);
+  }
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.signUp(parsed.data);
+    if (error) return fail(authErrorMessage(error.message));
+    if (!data.session) return fail("أكّد بريدك الإلكتروني من الرسالة ثم سجّل دخولك");
+    return ok(null);
+  } catch {
+    return fail("تعذّر الاتصال بخدمة التسجيل، حاول لاحقًا");
+  }
+}
+
 /** توليد رابط قصير (slug) من اسم المطعم — بحروف لاتينية إن أمكن وإلا عشوائي */
 function makeSlugBase(name: string): string {
   const latin = name

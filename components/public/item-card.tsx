@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { UtensilsCrossed } from "lucide-react";
+import { Heart, UtensilsCrossed } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
 import type { MenuCategory } from "@/lib/data";
 
@@ -13,9 +14,20 @@ type Props = {
   index?: number;
   delay?: number;
   themePrimary?: string;
+  favorite?: boolean;
+  onToggleFavorite?: () => void;
 };
 
-export function ItemCard({ item, currency, locale, index = 0, delay = 0, themePrimary }: Props) {
+export function ItemCard({
+  item,
+  currency,
+  locale,
+  index = 0,
+  delay = 0,
+  themePrimary,
+  favorite = false,
+  onToggleFavorite,
+}: Props) {
   return (
     <motion.article
       initial={{ opacity: 0, y: 22 }}
@@ -49,6 +61,24 @@ export function ItemCard({ item, currency, locale, index = 0, delay = 0, themePr
           </div>
         )}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" aria-hidden />
+        {/* زر التفضيل */}
+        {onToggleFavorite ? (
+          <button
+            type="button"
+            onClick={onToggleFavorite}
+            aria-label={locale === "ar" ? "حفظ في المفضلة" : "Save to favorites"}
+            aria-pressed={favorite}
+            className={cn(
+              "absolute top-3 flex h-9 w-9 items-center justify-center rounded-full border backdrop-blur transition-all active:scale-90",
+              favorite
+                ? "border-gold/60 bg-gold/25 text-gold"
+                : "border-border bg-black/50 text-cream/70 hover:border-gold/40 hover:text-gold",
+            )}
+            style={{ insetInlineEnd: "0.75rem" }}
+          >
+            <Heart className={cn("h-4 w-4", favorite && "fill-gold")} />
+          </button>
+        ) : null}
         {/* شارة السعر */}
         <span
           className="absolute bottom-3 rounded-full bg-gradient-to-l from-gold to-[#a87a2b] px-3.5 py-1 text-xs font-black text-background shadow-md"
