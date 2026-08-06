@@ -4,6 +4,7 @@ import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { categorySchema, imageUploadSchema, menuItemSchema } from "@/lib/validations";
 import { fromZod, fail, ok, type ActionResult } from "@/lib/actions/helpers";
+import { getOwnerRestaurant } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { imagePathFromUrl } from "@/lib/supabase/storage";
 
@@ -19,6 +20,13 @@ function diskError(e: unknown) {
   return fail("حدث خطأ غير متوقع أثناء حفظ البيانات");
 }
 
+/** مطعم المالك من الجلسة — بدون مطعم لا توجد أي عملية تعديل */
+async function requireOwnerRestaurant() {
+  const restaurant = await getOwnerRestaurant();
+  if (!restaurant) return null;
+  return restaurant;
+}
+
 /* ───────────────────────── الأقسام ───────────────────────── */
 
 export async function createCategoryAction(
@@ -30,9 +38,18 @@ export async function createCategoryAction(
     return fail(error, fieldErrors);
   }
   try {
-    const count = await prisma.category.count();
+    const restaurant = await requireOwnerRestaurant();
+    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+
+    const count = await prisma.category.count({
+      where: { restaurantId: restaurant.id },
+    });
     const category = await prisma.category.create({
-      data: { name: parsed.data.name, sortOrder: count + 1 },
+      data: {
+        name: parsed.data.name,
+        sortOrder: count + 1,
+        restaurantId: restaurant.id,
+      },
     });
     bumpMenuCache();
     return ok({ id: category.id });
@@ -52,6 +69,12 @@ export async function updateCategoryAction(
     return fail(error, fieldErrors);
   }
   try {
+    const restaurant = await requireOwnerRestaurant();
+    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+
+    const existing = await prisma.category.findUnique({ where: { id } });
+    if (!existing || existing.restaurantId !== restaurant.id) return fail("القسم غير موجود");
+
     await prisma.category.update({ where: { id }, data: parsed.data });
     bumpMenuCache();
     return ok(null);
@@ -62,11 +85,14 @@ export async function updateCategoryAction(
 
 export async function deleteCategoryAction(id: string): Promise<ActionResult<null>> {
   try {
+    const restaurant = await requireOwnerRestaurant();
+    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+
     const category = await prisma.category.findUnique({
       where: { id },
       include: { items: { select: { imageUrl: true } } },
     });
-    if (!category) return fail("القسم غير موجود");
+    if (!category || category.restaurantId !== restaurant.id) return fail("القسم غير موجود");
 
     // احذف صور العناصر التابعة
     const supabase = createClient();
@@ -86,8 +112,19 @@ export async function deleteCategoryAction(id: string): Promise<ActionResult<nul
 
 export async function reorderCategoriesAction(ids: string[]): Promise<ActionResult<null>> {
   try {
+    const restaurant = await requireOwnerRestaurant();
+    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+
+    const owned = await prisma.category.findMany({
+      where: { id: { in: ids }, restaurantId: restaurant.id },
+      select: { id: true },
+    });
+    if (owned.length !== ids.length) return fail("بعض الأقسام غير موجودة");
+
     await prisma.$transaction(
-      ids.map((id, index) => prisma.category.update({ where: { id }, data: { sortOrder: index + 1 } })),
+      ids.map((id, index) =>
+        prisma.category.update({ where: { id }, data: { sortOrder: index + 1 } }),
+      ),
     );
     bumpMenuCache();
     return ok(null);
@@ -117,12 +154,19 @@ export async function createMenuItemAction(
     return fail(error, fieldErrors);
   }
   try {
+    const restaurant = await requireOwnerRestaurant();
+    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+
+    const category = await prisma.category.findUnique({ where: { id: parsed.data.categoryId } });
+    if (!category || category.restaurantId !== restaurant.id) return fail("القسم غير موجود");
+
     const item = await prisma.menuItem.create({
       data: {
         name: parsed.data.name,
         description: parsed.data.description,
         price: parsed.data.price,
         categoryId: parsed.data.categoryId,
+        restaurantId: restaurant.id,
         imageUrl: parsed.data.imageUrl || null,
         isAvailable: parsed.data.isAvailable ?? true,
       },
@@ -144,14 +188,15 @@ export async function updateMenuItemAction(
     return fail(error, fieldErrors);
   }
   try {
+    const restaurant = await requireOwnerRestaurant();
+    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+
     const existing = await prisma.menuItem.findUnique({ where: { id } });
-    if (!existing) return fail("العنصر غير موجود");
+    if (!existing || existing.restaurantId !== restaurant.id) return fail("العنصر غير موجود");
 
     // صورة جديدة تستبدل القديمة في Storage
     const oldImage = existing.imageUrl ? imagePathFromUrl(existing.imageUrl) : null;
-    const newImage = parsed.data.imageUrl
-      ? imagePathFromUrl(parsed.data.imageUrl)
-      : null;
+    const newImage = parsed.data.imageUrl ? imagePathFromUrl(parsed.data.imageUrl) : null;
     if (oldImage && newImage && oldImage !== newImage) {
       const supabase = createClient();
       await supabase.storage.from(BUCKET).remove([oldImage]);
@@ -177,8 +222,11 @@ export async function updateMenuItemAction(
 
 export async function deleteMenuItemAction(id: string): Promise<ActionResult<null>> {
   try {
+    const restaurant = await requireOwnerRestaurant();
+    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+
     const existing = await prisma.menuItem.findUnique({ where: { id } });
-    if (!existing) return fail("العنصر غير موجود");
+    if (!existing || existing.restaurantId !== restaurant.id) return fail("العنصر غير موجود");
 
     if (existing.imageUrl) {
       const supabase = createClient();
@@ -200,6 +248,12 @@ export async function toggleItemAvailabilityAction(
   isAvailable: boolean,
 ): Promise<ActionResult<null>> {
   try {
+    const restaurant = await requireOwnerRestaurant();
+    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+
+    const existing = await prisma.menuItem.findUnique({ where: { id } });
+    if (!existing || existing.restaurantId !== restaurant.id) return fail("العنصر غير موجود");
+
     await prisma.menuItem.update({ where: { id }, data: { isAvailable } });
     bumpMenuCache();
     return ok(null);
@@ -227,6 +281,9 @@ export async function uploadMenuItemImageAction(
   }
 
   try {
+    const restaurant = await requireOwnerRestaurant();
+    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+
     const bytes = new Uint8Array(await file.arrayBuffer());
     const isWebp = file.type === "image/webp";
     const ext = isWebp ? "webp" : "jpg";

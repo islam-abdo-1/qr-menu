@@ -13,6 +13,7 @@ type Props = {
   dict: Dictionary;
   data: MenuData;
   locale: "ar" | "en";
+  langHref?: string;
 };
 
 /** فاصل زخرفي: خط — معيّن — خط */
@@ -28,7 +29,7 @@ function Ornament({ className }: { className?: string }) {
   );
 }
 
-export function MenuView({ dict, data, locale }: Props) {
+export function MenuView({ dict, data, locale, langHref }: Props) {
   const categories = data.categories;
   const restaurantName =
     data.settings?.restaurantName || (locale === "ar" ? "قائمة الطعام" : "Menu");
@@ -208,7 +209,7 @@ export function MenuView({ dict, data, locale }: Props) {
                 })}
               </div>
               <Link
-                href={locale === "ar" ? "/en" : "/"}
+                href={langHref ?? (locale === "ar" ? "/en" : "/")}
                 className="flex shrink-0 items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-3.5 py-1.5 text-xs font-black text-gold transition-colors hover:bg-gold/20"
               >
                 <Languages className="h-3.5 w-3.5" />

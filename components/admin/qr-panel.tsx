@@ -11,7 +11,13 @@ import { Input } from "@/components/ui/input";
 const QR_DARK = "#1F1A17";
 const QR_LIGHT = "#FFFFFF";
 
-export function QrPanel({ restaurantName = "QR Menu" }: { restaurantName?: string }) {
+export function QrPanel({
+  restaurantName = "QR Menu",
+  menuUrl,
+}: {
+  restaurantName?: string;
+  menuUrl?: string;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [url, setUrl] = useState<string>("");
   const [copied, setCopied] = useState(false);
@@ -19,8 +25,8 @@ export function QrPanel({ restaurantName = "QR Menu" }: { restaurantName?: strin
   useEffect(() => {
     if (typeof window === "undefined") return;
     const base = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
-    setUrl(base || window.location.origin);
-  }, []);
+    setUrl(menuUrl || base || window.location.origin);
+  }, [menuUrl]);
 
   useEffect(() => {
     if (!url || !canvasRef.current) return;

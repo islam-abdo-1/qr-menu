@@ -36,6 +36,10 @@ export function AdminShell({ data }: { data: AdminData }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("items");
 
+  const menuPath = `/m/${data.restaurant.slug}`;
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
+  const menuUrl = `${siteUrl}${menuPath}`;
+
   const stats = useMemo(() => {
     const totalItems = data.categories.reduce((n, c) => n + c.items.length, 0);
     const hidden = data.categories.reduce(
@@ -116,7 +120,7 @@ export function AdminShell({ data }: { data: AdminData }) {
 
         <div className="mt-auto flex flex-col gap-2 border-t border-gold/15 p-4">
           <Button variant="outline" asChild className="justify-start rounded-xl">
-            <a href="/" target="_blank" rel="noopener noreferrer">
+            <a href={menuPath} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="h-4 w-4 text-gold" />
               معاينة المنيو العام
             </a>
@@ -165,7 +169,7 @@ export function AdminShell({ data }: { data: AdminData }) {
           {tab === "items" && <ItemsPanel data={data} onChanged={onChanged} />}
           {tab === "categories" && <CategoriesPanel data={data} onChanged={onChanged} />}
           {tab === "settings" && <SettingsPanel settings={data.settings} onSaved={onChanged} />}
-          {tab === "qr" && <QrPanel restaurantName={data.settings.restaurantName} />}
+          {tab === "qr" && <QrPanel restaurantName={data.settings.restaurantName} menuUrl={menuUrl} />}
         </div>
       </main>
     </div>

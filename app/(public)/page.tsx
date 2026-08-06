@@ -12,5 +12,5 @@ export const metadata: Metadata = {
 
 export default async function PublicMenuPage() {
   const [data, dict] = await Promise.all([getMenuData(), Promise.resolve(getDictionary("ar"))]);
-  return <MenuView dict={dict} data={data} locale="ar" />;
+  return <MenuView dict={dict} data={data ?? { settings: null, categories: [] }} locale="ar" />;
 }

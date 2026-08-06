@@ -42,6 +42,12 @@ export const credentialsSchema = z.object({
   password: z.string().min(8, "كلمة المرور 8 أحرف على الأقل").max(72),
 });
 
+export const signupSchema = z.object({
+  restaurantName: text(1, 60, "اسم المطعم مطلوب"),
+  email: z.string().trim().toLowerCase().email("بريد إلكتروني غير صالح").max(254),
+  password: z.string().min(8, "كلمة المرور 8 أحرف على الأقل").max(72),
+});
+
 export const imageUploadSchema = z.object({
   name: z.string().max(255),
   size: z.number().max(12 * 1024 * 1024, "الصورة أكبر من 12MB"),

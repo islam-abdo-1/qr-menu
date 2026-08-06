@@ -2,34 +2,61 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Loader2, Lock, Mail, ShieldCheck, UtensilsCrossed } from "lucide-react";
-import { signInAction } from "@/lib/actions/auth";
+import { CheckCircle2, Loader2, Lock, Mail, ShieldCheck, Store, UtensilsCrossed } from "lucide-react";
+import { registerRestaurantAction } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils";
 
-export function LoginForm() {
-  const router = useRouter();
+export function SignupForm() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
   const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setFieldErrors(null);
     setLoading(true);
-    const res = await signInAction(email, password);
+    const res = await registerRestaurantAction({ restaurantName: name, email, password });
     if (res.ok) {
-      router.push("/admin");
-      router.refresh();
+      setDone(res.data.slug);
     } else {
       setError(res.error);
       if (res.fieldErrors) setFieldErrors(res.fieldErrors);
     }
     setLoading(false);
+  }
+
+  if (done) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45 }}
+        className="relative overflow-hidden rounded-3xl border border-border bg-card shadow-elevated"
+      >
+        <div className="h-1.5 bg-gradient-to-r from-gold via-[#a87a2b] to-gold" />
+        <div className="flex flex-col items-center gap-5 p-10 text-center">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/15 text-green-500">
+            <CheckCircle2 className="h-10 w-10" />
+          </div>
+          <h1 className="font-display text-3xl font-bold text-gold-gradient">تم إنشاء مطعمك!</h1>
+          <p className="max-w-sm text-sm leading-relaxed text-cream/75">
+            حسابك جاهز فورًا — سجّل دخولك الآن لتبدأ إدارة قائمتك واستقبال طلباتك.
+          </p>
+          <Link
+            href="/login"
+            className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-gold to-[#a87a2b] font-black text-background shadow-[0_12px_36px_-10px_rgba(212,168,83,0.55)] transition-all hover:brightness-110 active:scale-[0.98]"
+          >
+            الذهاب لتسجيل الدخول
+          </Link>
+        </div>
+      </motion.div>
+    );
   }
 
   return (
@@ -53,12 +80,36 @@ export function LoginForm() {
             <UtensilsCrossed className="h-8 w-8" />
           </motion.div>
           <div>
-            <h1 className="font-display text-3xl font-bold text-gold-gradient">لوحة إدارة المنيو</h1>
-            <p className="mt-1.5 text-sm text-cream/75">سجّل دخولك للتحكم في قائمتك</p>
+            <h1 className="font-display text-3xl font-bold text-gold-gradient">أنشئ مطعمك مجانًا</h1>
+            <p className="mt-1.5 text-sm text-cream/75">قائمة رقمية + تفضيلات + استقبال الطلبات</p>
           </div>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
+          <div className="space-y-2">
+            <label htmlFor="restaurant-name" className="text-sm font-bold">
+              اسم المطعم
+            </label>
+            <div className="group relative">
+              <Store className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
+              <input
+                id="restaurant-name"
+                type="text"
+                autoComplete="organization"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="مثال: كافي الميدان"
+                className={cn(
+                  "h-12 w-full rounded-xl border border-input bg-background ps-11 pe-3 text-sm shadow-sm outline-none transition-all focus:border-primary/50 focus:ring-4 focus:ring-primary/10",
+                  fieldErrors?.restaurantName && "border-destructive",
+                )}
+              />
+            </div>
+            {fieldErrors?.restaurantName?.[0] && (
+              <p className="text-xs font-medium text-destructive">{fieldErrors.restaurantName[0]}</p>
+            )}
+          </div>
+
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-bold">
               البريد الإلكتروني
@@ -92,10 +143,10 @@ export function LoginForm() {
               <input
                 id="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="8 أحرف على الأقل"
                 className={cn(
                   "h-12 w-full rounded-xl border border-input bg-background ps-11 pe-3 text-sm font-medium shadow-sm outline-none transition-all focus:border-primary/50 focus:ring-4 focus:ring-primary/10",
                   fieldErrors?.password && "border-destructive",
@@ -123,20 +174,20 @@ export function LoginForm() {
             className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-gold to-[#a87a2b] font-black text-background shadow-[0_12px_36px_-10px_rgba(212,168,83,0.55)] transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {loading ? "جارٍ الدخول..." : "دخول"}
+            {loading ? "جارٍ الإنشاء..." : "إنشاء المطعم"}
           </button>
         </form>
 
-        <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
-          <ShieldCheck className="h-3.5 w-3.5 text-primary/70" />
-          المنطقة محمية — لا يُسمح بالوصول للعامة
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          عندك حساب؟{" "}
+          <Link href="/login" className="font-bold text-gold hover:underline">
+            سجّل الدخول
+          </Link>
         </p>
 
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          ما عندك مطعم؟{" "}
-          <Link href="/signup" className="font-bold text-gold hover:underline">
-            أنشئ مطعمك مجانًا
-          </Link>
+        <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+          <ShieldCheck className="h-3.5 w-3.5 text-primary/70" />
+          منيو منفصل لكل مطعم برابط خاص
         </p>
       </div>
     </motion.div>

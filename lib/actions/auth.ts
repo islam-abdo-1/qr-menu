@@ -1,8 +1,11 @@
 "use server";
 
+import { z } from "zod";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { credentialsSchema } from "@/lib/validations";
+import { credentialsSchema, signupSchema } from "@/lib/validations";
 import { ActionResult, fail, fromZod, ok } from "@/lib/actions/helpers";
+import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
 export async function signInAction(
@@ -68,5 +71,82 @@ export async function signOutAction(): Promise<ActionResult<null>> {
     return ok(null);
   } catch {
     return fail("تعذّر تسجيل الخروج من الحساب");
+  }
+}
+
+/* ───────────────────────── تسجيل مطعم جديد ───────────────────────── */
+
+/** مطعم المالك من الجلسة — تُستخدم في لوحة الإدارة وكل إجراءات التعديل */
+function createSupabaseAdmin() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } },
+  );
+}
+
+/** توليد رابط قصير (slug) من اسم المطعم — بحروف لاتينية إن أمكن وإلا عشوائي */
+function makeSlugBase(name: string): string {
+  const latin = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return latin || `m-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function uniqueSlug(name: string): Promise<string> {
+  const base = makeSlugBase(name);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const candidate = attempt === 0 ? base : `${base}-${Math.random().toString(36).slice(2, 5)}`;
+    const existing = await prisma.restaurant.findUnique({ where: { slug: candidate } });
+    if (!existing) return candidate;
+  }
+  return `m-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export async function registerRestaurantAction(
+  input: z.infer<typeof signupSchema>,
+): Promise<ActionResult<{ slug: string }>> {
+  const parsed = signupSchema.safeParse(input);
+  if (!parsed.success) {
+    const { error, fieldErrors } = fromZod(parsed.error);
+    return fail(error, fieldErrors);
+  }
+
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.signUp({
+      email: parsed.data.email,
+      password: parsed.data.password,
+    });
+    if (error) return fail(authErrorMessage(error.message));
+    const user = data.user;
+    if (!user) return fail("تعذّر إنشاء الحساب — حاول مجددًا");
+
+    try {
+      const slug = await uniqueSlug(parsed.data.restaurantName);
+      const staffPin = String(Math.floor(1000 + Math.random() * 9000));
+      const restaurant = await prisma.restaurant.create({
+        data: {
+          slug,
+          name: parsed.data.restaurantName,
+          ownerId: user.id,
+          staffPin,
+        },
+      });
+      await prisma.setting.create({
+        data: { restaurantName: parsed.data.restaurantName, restaurantId: restaurant.id },
+      });
+      return ok({ slug });
+    } catch (e) {
+      // فشل إنشاء بيانات المطعم — احذف حساب Supabase حتى لا يبقى حسابًا يتيمًا
+      console.error("[signup] فشل إنشاء المطعم:", e);
+      const admin = createSupabaseAdmin();
+      await admin.auth.admin.deleteUser(user.id);
+      return fail("تعذّر إنشاء المطعم — حاول مجددًا");
+    }
+  } catch {
+    return fail("تعذّر الاتصال بخدمة التسجيل، حاول لاحقًا");
   }
 }

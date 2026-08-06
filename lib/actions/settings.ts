@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { imageUploadSchema, settingsSchema } from "@/lib/validations";
 import { fromZod, fail, ok, type ActionResult } from "@/lib/actions/helpers";
+import { getOwnerRestaurant } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { imagePathFromUrl } from "@/lib/supabase/storage";
 
@@ -19,7 +20,12 @@ export async function updateSettingsAction(
     return fail(error, fieldErrors);
   }
   try {
-    const existing = await prisma.setting.findFirst();
+    const restaurant = await getOwnerRestaurant();
+    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+
+    const existing = await prisma.setting.findUnique({
+      where: { restaurantId: restaurant.id },
+    });
 
     // حذف الشعار القديم من التخزين عند استبداله أو إزالته
     if (existing?.logoUrl) {
@@ -33,7 +39,9 @@ export async function updateSettingsAction(
     if (existing) {
       await prisma.setting.update({ where: { id: existing.id }, data: parsed.data });
     } else {
-      await prisma.setting.create({ data: parsed.data });
+      await prisma.setting.create({
+        data: { ...parsed.data, restaurantId: restaurant.id },
+      });
     }
     revalidateTag("menu");
     return ok(null);

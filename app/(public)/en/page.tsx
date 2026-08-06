@@ -14,7 +14,7 @@ export default async function PublicMenuEnPage() {
   const [data, dict] = await Promise.all([getMenuData(), Promise.resolve(getDictionary("en"))]);
   return (
     <div dir="ltr" lang="en">
-      <MenuView dict={dict} data={data} locale="en" />
+      <MenuView dict={dict} data={data ?? { settings: null, categories: [] }} locale="en" />
     </div>
   );
 }

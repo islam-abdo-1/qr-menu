@@ -10,31 +10,92 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+/// مطعم داخل المنصة — كل مطعم له منيو وإعدادات وطلبات مستقلة
+model Restaurant {
+  id        String     @id @default(cuid())
+  slug      String     @unique
+  name      String
+  ownerId   String     @unique // Supabase Auth user id
+  staffPin  String     @default("") // كود دخول الموظفين
+  createdAt DateTime   @default(now())
+  settings  Setting?
+  categories Category[]
+  menuItems  MenuItem[]
+  orders     Order[]
+}
+
 model Setting {
-  id              Int      @id @default(autoincrement())
-  restaurantName  String   @default("مطعمي")
-  currency        String   @default("EGP")
-  themePrimary    String   @default("#C84C21")
-  logoUrl         String?  @default("")
-  createdAt       DateTime @default(now())
+  id             Int        @id @default(autoincrement())
+  restaurantId   String     @unique
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  restaurantName String     @default("مطعمي")
+  currency       String     @default("EGP")
+  themePrimary   String     @default("#C84C21")
+  logoUrl        String?    @default("")
+  createdAt      DateTime   @default(now())
 }
 
 model Category {
-  id        String     @id @default(uuid())
-  name      String
-  sortOrder Int        @default(0)
-  createdAt DateTime   @default(now())
-  items     MenuItem[]
+  id           String     @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  sortOrder    Int        @default(0)
+  createdAt    DateTime   @default(now())
+  items        MenuItem[]
 }
 
 model MenuItem {
-  id          String    @id @default(uuid())
-  name        String
-  description String?
-  price       Float
-  imageUrl    String?
-  isAvailable Boolean   @default(true)
-  categoryId  String
-  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
+  id           String     @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  price        Float
+  imageUrl     String?
+  isAvailable  Boolean    @default(true)
+  categoryId   String
+  category     Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  favorites    Favorite[]
+}
+
+/// تفضيلات الزبون — userId = Supabase Auth user id
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  itemId    String
+  item      MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, itemId])
+}
+
+/// طلب — يمكن تقديمه بدون حساب (الزبون قد يربطه بحسابه لاحقًا)
+model Order {
+  id           String      @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  number       Int
+  type         String // dine-in | delivery
+  customerName String
+  tableNo      String?
+  phone        String?
+  address      String?
+  notes        String?
+  status       String      @default("new") // new | preparing | done
+  total        Float
+  createdAt    DateTime    @default(now())
+  items        OrderItem[]
+
+  @@unique([restaurantId, number])
+}
+
+model OrderItem {
+  id      String @id @default(uuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  name    String
+  price   Float
+  qty     Int
 }

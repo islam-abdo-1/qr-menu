@@ -41,13 +41,29 @@ const CATEGORIES = [
 
 async function main() {
   // امسح البيانات القديمة
+  await prisma.orderItem.deleteMany();
+  await prisma.order.deleteMany();
+  await prisma.favorite.deleteMany();
   await prisma.menuItem.deleteMany();
   await prisma.category.deleteMany();
   await prisma.setting.deleteMany();
+  await prisma.restaurant.deleteMany();
+
+  // المطعم التجريبي (ownerId يُستبدل بمعرّف حسابك الفعلي في Supabase)
+  const demoOwnerId = process.env.DEMO_OWNER_ID ?? "demo-owner";
+  const restaurant = await prisma.restaurant.create({
+    data: {
+      slug: "kafy",
+      name: "مطعم أبو القوة",
+      ownerId: demoOwnerId,
+      staffPin: "2481",
+    },
+  });
 
   // الإعدادات
   await prisma.setting.create({
     data: {
+      restaurantId: restaurant.id,
       restaurantName: "مطعم أبو القوة",
       currency: "EGP",
       themePrimary: "#C84C21",
@@ -60,7 +76,10 @@ async function main() {
       data: {
         name: cat.name,
         sortOrder: cat.sortOrder,
-        items: { create: cat.items },
+        restaurantId: restaurant.id,
+        items: {
+          create: cat.items.map((item) => ({ ...item, restaurantId: restaurant.id })),
+        },
       },
     });
   }
