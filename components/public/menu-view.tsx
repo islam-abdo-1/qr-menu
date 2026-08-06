@@ -192,7 +192,7 @@ export function MenuView({ dict, data, locale, langHref }: Props) {
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-display text-6xl font-bold leading-tight text-gold-gradient drop-shadow-[0_4px_24px_rgba(212,168,83,0.25)] sm:text-7xl md:text-8xl"
+            className="font-display text-6xl font-bold text-gold-gradient drop-shadow-[0_4px_24px_rgba(212,168,83,0.25)] sm:text-7xl md:text-8xl"
           >
             {restaurantName}
           </motion.h1>

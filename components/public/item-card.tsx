@@ -98,7 +98,7 @@ export function ItemCard({
 
       {/* التفاصيل */}
       <div className="flex flex-1 flex-col p-4">
-        <h3 className="font-display text-xl font-bold leading-snug text-cream">
+        <h3 className="font-display text-xl font-bold text-cream">
           {item.name}
         </h3>
         {item.description ? (

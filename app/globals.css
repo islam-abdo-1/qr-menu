@@ -51,6 +51,11 @@
     @apply bg-background font-cairo text-foreground antialiased;
   }
 
+  /* خط Amiri الكاليجرافي حروفه أطول من مسافات السطر الافتراضية — نحتاج 1.75 حتى لا تُقص الحروف */
+  .font-display {
+    line-height: 1.75 !important;
+  }
+
   ::selection {
     background: rgb(200 76 33 / 0.18);
   }

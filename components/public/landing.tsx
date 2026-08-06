@@ -77,7 +77,7 @@ export function Landing({ lang = "ar" }: { lang?: Lang }) {
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="max-w-3xl font-display text-4xl font-bold leading-snug text-gold-gradient drop-shadow-[0_4px_24px_rgba(212,168,83,0.25)] sm:text-6xl md:text-7xl md:leading-tight"
+            className="max-w-3xl font-display text-4xl font-bold text-gold-gradient drop-shadow-[0_4px_24px_rgba(212,168,83,0.25)] sm:text-6xl md:text-7xl"
           >
             {t.title1}
             <br />
