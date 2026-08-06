@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Heart, UtensilsCrossed } from "lucide-react";
+import { Heart, Plus, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
 import type { MenuCategory } from "@/lib/data";
@@ -16,6 +16,8 @@ type Props = {
   themePrimary?: string;
   favorite?: boolean;
   onToggleFavorite?: () => void;
+  qtyInCart?: number;
+  onAdd?: () => void;
 };
 
 export function ItemCard({
@@ -27,6 +29,8 @@ export function ItemCard({
   themePrimary,
   favorite = false,
   onToggleFavorite,
+  qtyInCart = 0,
+  onAdd,
 }: Props) {
   return (
     <motion.article
@@ -108,18 +112,42 @@ export function ItemCard({
         ) : null}
 
         <div className="mt-auto pt-3">
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-cream/65">
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ background: item.isAvailable ? "#3ECF7A" : "#5A4F44" }}
-            />
-            {item.isAvailable
-              ? locale === "ar"
-                ? "متاح الآن"
-                : "Available"
-              : locale === "ar"
-                ? "غير متاح حاليًا"
-                : "Unavailable"}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-cream/65">
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ background: item.isAvailable ? "#3ECF7A" : "#5A4F44" }}
+              />
+              {item.isAvailable
+                ? locale === "ar"
+                  ? "متاح الآن"
+                  : "Available"
+                : locale === "ar"
+                  ? "غير متاح حاليًا"
+                  : "Unavailable"}
+            </div>
+            {onAdd && item.isAvailable ? (
+              <button
+                type="button"
+                onClick={onAdd}
+                aria-label={locale === "ar" ? "إضافة إلى السلة" : "Add to cart"}
+                className={cn(
+                  "flex h-9 items-center justify-center gap-1.5 rounded-full border font-black transition-all active:scale-90",
+                  qtyInCart > 0
+                    ? "border-gold/60 bg-gold/15 px-3.5 text-gold"
+                    : "border-gold/30 bg-gold/10 px-3 text-cream hover:bg-gold/20 hover:text-gold",
+                )}
+              >
+                <Plus className="h-4 w-4" />
+                {qtyInCart > 0 ? (
+                  <span className="text-xs">{qtyInCart}</span>
+                ) : (
+                  <span className="text-xs">
+                    {locale === "ar" ? "أضف" : "Add"}
+                  </span>
+                )}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

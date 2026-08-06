@@ -30,5 +30,5 @@ export default async function RestaurantMenuPage({
     Promise.resolve(getDictionary("ar")),
   ]);
   if (!data) notFound();
-  return <MenuView dict={dict} data={data} locale="ar" langHref={`/m/${slug}/en`} />;
+  return <MenuView dict={dict} data={data} locale="ar" slug={slug} langHref={`/m/${slug}/en`} />;
 }

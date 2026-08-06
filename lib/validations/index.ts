@@ -56,3 +56,27 @@ export const imageUploadSchema = z.object({
     .max(40)
     .startsWith("image/", "يجب أن يكون الملف صورة"),
 });
+
+export const orderSchema = z.object({
+  restaurantSlug: text(1, 100, "المطعم مطلوب"),
+  customerName: text(1, 80, "اسمك مطلوب"),
+  type: z.enum(["dine-in", "delivery"], { message: "نوع الطلب غير صالح" }),
+  tableNo: z.string().trim().max(20).optional(),
+  phone: z.string().trim().max(20).optional(),
+  address: z.string().trim().max(300).optional(),
+  notes: z.string().trim().max(300).optional(),
+  items: z
+    .array(
+      z.object({
+        itemId: z.string().min(1),
+        qty: z.number().int().min(1).max(50),
+      }),
+    )
+    .min(1, "السلة فارغة")
+    .max(30, "عدد الأصناف كبير جدًا"),
+});
+
+export const staffLoginSchema = z.object({
+  slug: text(1, 100, "المطعم مطلوب"),
+  pin: z.string().trim().min(4, "الكود السري 4 أرقام على الأقل").max(12),
+});

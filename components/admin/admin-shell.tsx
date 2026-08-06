@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  ClipboardList,
   ExternalLink,
   LayoutDashboard,
   LogOut,
@@ -21,11 +22,13 @@ import { ItemsPanel } from "@/components/admin/items-panel";
 import { CategoriesPanel } from "@/components/admin/categories-panel";
 import { SettingsPanel } from "@/components/admin/settings-panel";
 import { QrPanel } from "@/components/admin/qr-panel";
+import { OrdersPanel } from "@/components/admin/orders-panel";
 import type { AdminData } from "@/components/admin/types";
 
-type Tab = "items" | "categories" | "settings" | "qr";
+type Tab = "orders" | "items" | "categories" | "settings" | "qr";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
+  { id: "orders", label: "الطلبات", icon: ClipboardList },
   { id: "items", label: "العناصر", icon: ShoppingBag },
   { id: "categories", label: "الأقسام", icon: Tags },
   { id: "settings", label: "الإعدادات", icon: Settings },
@@ -166,6 +169,7 @@ export function AdminShell({ data }: { data: AdminData }) {
             </div>
           </div>
 
+          {tab === "orders" && <OrdersPanel onChanged={onChanged} />}
           {tab === "items" && <ItemsPanel data={data} onChanged={onChanged} />}
           {tab === "categories" && <CategoriesPanel data={data} onChanged={onChanged} />}
           {tab === "settings" && <SettingsPanel settings={data.settings} onSaved={onChanged} />}

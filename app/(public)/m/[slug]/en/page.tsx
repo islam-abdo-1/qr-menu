@@ -32,7 +32,7 @@ export default async function RestaurantMenuEnPage({
   if (!data) notFound();
   return (
     <div dir="ltr" lang="en">
-      <MenuView dict={dict} data={data} locale="en" langHref={`/m/${slug}`} />
+      <MenuView dict={dict} data={data} locale="en" slug={slug} langHref={`/m/${slug}`} />
     </div>
   );
 }

@@ -3,20 +3,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ChevronDown, Heart, Languages, ScanLine, Sparkles, UtensilsCrossed } from "lucide-react";
+import { ChevronDown, Heart, Languages, ScanLine, ShoppingBag, Sparkles, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatPrice } from "@/lib/utils";
 import type { MenuData } from "@/lib/data";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/client";
 import { getFavoriteItemsAction, toggleFavoriteAction } from "@/lib/actions/favorites";
 import { ItemCard } from "@/components/public/item-card";
 import { FavoritesAuth } from "@/components/public/favorites-auth";
+import { CartDrawer } from "@/components/public/cart-drawer";
+import { loadCart, saveCart, cartCount, cartTotal, type CartItem } from "@/lib/cart";
 
 type Props = {
   dict: Dictionary;
   data: MenuData;
   locale: "ar" | "en";
   langHref?: string;
+  slug?: string;
 };
 
 type FavoriteItem = {
@@ -40,12 +44,61 @@ function Ornament({ className }: { className?: string }) {
   );
 }
 
-export function MenuView({ dict, data, locale, langHref }: Props) {
+export function MenuView({ dict, data, locale, langHref, slug }: Props) {
   const categories = data.categories;
   const restaurantName =
     data.settings?.restaurantName || (locale === "ar" ? "قائمة الطعام" : "Menu");
   const currency = data.settings?.currency ?? "EGP";
   const themePrimary = data.settings?.themePrimary || "#C84C21";
+
+  /* ───── السلة ───── */
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
+
+  useEffect(() => {
+    if (slug) setCart(loadCart(slug));
+  }, [slug]);
+
+  useEffect(() => {
+    if (slug) saveCart(slug, cart);
+  }, [slug, cart]);
+
+  const addToCart = useCallback(
+    (item: { id: string; name: string; price: number; imageUrl: string | null }) => {
+      setCart((prev) => {
+        const existing = prev.find((i) => i.itemId === item.id);
+        if (existing) {
+          return prev.map((i) =>
+            i.itemId === item.id ? { ...i, qty: Math.min(i.qty + 1, 50) } : i,
+          );
+        }
+        return [
+          ...prev,
+          { itemId: item.id, name: item.name, price: item.price, imageUrl: item.imageUrl, qty: 1 },
+        ];
+      });
+    },
+    [],
+  );
+
+  const updateQty = useCallback((itemId: string, qty: number) => {
+    setCart((prev) =>
+      qty <= 0 ? prev.filter((i) => i.itemId !== itemId) : prev.map((i) => (i.itemId === itemId ? { ...i, qty: Math.min(qty, 50) } : i)),
+    );
+  }, []);
+
+  const removeFromCart = useCallback((itemId: string) => {
+    setCart((prev) => prev.filter((i) => i.itemId !== itemId));
+  }, []);
+
+  const handleOrderPlaced = useCallback(() => {
+    setCart([]);
+  }, []);
+
+  const cartQtyOf = useCallback(
+    (itemId: string) => cart.find((i) => i.itemId === itemId)?.qty ?? 0,
+    [cart],
+  );
 
   const [active, setActive] = useState<string | null>(categories[0]?.id ?? null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -334,6 +387,15 @@ export function MenuView({ dict, data, locale, langHref }: Props) {
                     themePrimary={themePrimary}
                     favorite={true}
                     onToggleFavorite={() => handleToggleFavorite(f.id)}
+                    qtyInCart={cartQtyOf(f.id)}
+                    onAdd={() =>
+                      addToCart({
+                        id: f.id,
+                        name: f.name,
+                        price: f.price,
+                        imageUrl: f.imageUrl,
+                      })
+                    }
                   />
                 ))}
               </div>
@@ -376,6 +438,15 @@ export function MenuView({ dict, data, locale, langHref }: Props) {
                       themePrimary={themePrimary}
                       favorite={favIds.current.has(item.id)}
                       onToggleFavorite={() => handleToggleFavorite(item.id)}
+                      qtyInCart={cartQtyOf(item.id)}
+                      onAdd={() =>
+                        addToCart({
+                          id: item.id,
+                          name: item.name,
+                          price: item.price,
+                          imageUrl: item.imageUrl,
+                        })
+                      }
                     />
                   ))}
                 </div>
@@ -391,6 +462,49 @@ export function MenuView({ dict, data, locale, langHref }: Props) {
         onOpenChange={setAuthOpen}
         onAuthed={handleAuthed}
       />
+
+      {/* ───── درج السلة ───── */}
+      <CartDrawer
+        open={cartOpen}
+        onOpenChange={setCartOpen}
+        slug={slug ?? ""}
+        locale={locale}
+        currency={currency}
+        items={cart}
+        onUpdateQty={updateQty}
+        onRemove={removeFromCart}
+        onOrderPlaced={handleOrderPlaced}
+      />
+
+      {/* ───── شريط السلة العائم ───── */}
+      {slug && cart.length > 0 ? (
+        <motion.div
+          initial={{ y: 90, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="fixed inset-x-0 bottom-5 z-40 px-4"
+        >
+          <button
+            type="button"
+            onClick={() => setCartOpen(true)}
+            className="mx-auto flex w-full max-w-md items-center justify-between gap-3 rounded-2xl border border-gold/40 bg-[#191310]/95 px-5 py-3.5 shadow-[0_20px_60px_-12px_rgba(0,0,0,0.8)] backdrop-blur-xl transition-transform active:scale-[0.98]"
+          >
+            <span className="flex items-center gap-2.5">
+              <span className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-gold to-[#a87a2b] text-background">
+                <ShoppingBag className="h-5 w-5" />
+                <span className="absolute -end-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#3ECF7A] px-1 text-[10px] font-black text-background ring-2 ring-[#191310]">
+                  {cartCount(cart)}
+                </span>
+              </span>
+              <span className="text-sm font-black text-cream">
+                {locale === "ar" ? "عرض السلة" : "View cart"}
+              </span>
+            </span>
+            <span className="text-sm font-black text-gold">
+              {formatPrice(cartTotal(cart), currency, locale)}
+            </span>
+          </button>
+        </motion.div>
+      ) : null}
 
       {/* ───── الفوتر ───── */}
       <footer className="mt-24 overflow-hidden">
