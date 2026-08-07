@@ -1,7 +1,8 @@
 import "server-only";
 import { unstable_cache as cache } from "next/cache";
+import { cookies } from "next/headers";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
-import { createClient } from "@/lib/supabase/server";
 
 /** العلامة المستخدمة لكل تجديد بعد التعديل من لوحة الإدارة */
 export const MENU_TAG = "menu";
@@ -111,7 +112,7 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
 
 /**
  * منيو مطعم — بدون slug: المطعم الرئيسي (الرابط الأساسي للموقع).
- * البيانات في كاش ISR لمدة 60 ثانية (تُحدَّث فورًا من لوحة الإدارة عبر revalidateTag).
+ * البيانات في كاش ISR لمدة 300 ثانية (تُحدَّث فورًا من لوحة الإدارة عبر revalidateTag).
  */
 export const getMenuData = cache(
   async (slug?: string): Promise<MenuData | null> => {
@@ -121,7 +122,7 @@ export const getMenuData = cache(
     return restaurant ? loadRestaurant(restaurant.id) : null;
   },
   ["qr-menu"],
-  { tags: [MENU_TAG], revalidate: 60 },
+  { tags: [MENU_TAG], revalidate: 300 },
 );
 
 /** استعلام المطعم نفسه بكاش قصير — id و slug ثابتان، والتغييرات تُمسح عبر OWNER_TAG */
@@ -132,14 +133,58 @@ const cachedOwner = cache(
   { tags: [OWNER_TAG], revalidate: 20 },
 );
 
+/** العلامة لكاش مستخدم Supabase — تُمسح عند تسجيل الخروج */
+export const AUTH_USER_TAG = "auth-user";
+
+/**
+ * مستخدم Supabase الحالي بكاش 20 ثانية — مفتاحه توكن الجلسة:
+ * يمنع رحلة الشبكة (getUser) من كل بولينج لوحة الإدارة،
+ * والتحقق الفعلي من الجلسة يظل قائمًا كل 20 ثانية.
+ * ملاحظة: لا تُستخدم createClient (تعتمد على cookies()) داخل الكاش —
+ * ننشئ عميلًا خفيفًا بالتوكن نفسه لتجنب كسر العرض.
+ */
+const cachedAuthUser = cache(
+  async (token: string) => {
+    if (!token) return null;
+    const supabase = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      },
+    );
+    const { data } = await supabase.auth.getUser(token);
+    return data.user?.id ?? null;
+  },
+  ["qr-menu-auth-user"],
+  { tags: [AUTH_USER_TAG], revalidate: 20 },
+);
+
+/** مطعم المالك الحالي من الجلسة — تُستخدم في لوحة الإدارة وكل إجراءات التعديل */
+/** استخراج توكن الوصول من كوكيز جلسة Supabase SSR:
+ *  القيمة بصيغة base64-<json> (أو JWT خام في بعض الإعدادات) — لا تُمرَّر كما هي. */
+function tokenFromSessionCookie(value: string): string | null {
+  if (!value.startsWith("base64-")) return value || null;
+  try {
+    const b64 = value.slice(7).replace(/-/g, "+").replace(/_/g, "/");
+    const session = JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
+    return typeof session.access_token === "string" ? session.access_token : null;
+  } catch {
+    return null;
+  }
+}
+
 /** مطعم المالك الحالي من الجلسة — تُستخدم في لوحة الإدارة وكل إجراءات التعديل */
 export async function getOwnerRestaurant() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  return cachedOwner(user.id);
+  const cookie = cookies()
+    .getAll()
+    .find((c) => c.name.endsWith("-auth-token"));
+  const token = cookie ? tokenFromSessionCookie(cookie.value) : null;
+  if (!token) return null;
+  const userId = await cachedAuthUser(token);
+  if (!userId) return null;
+  return cachedOwner(userId);
 }
 
 /** بيانات حيّة (بدون كاش) — داخل لوحة الإدارة فقط، مقيدة بمطعم المالك */

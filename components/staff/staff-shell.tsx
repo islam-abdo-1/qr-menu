@@ -86,12 +86,12 @@ export function StaffShell({ slug }: { slug?: string }) {
     });
   }, [loadOrders]);
 
-  // تحديث تلقائي كل 5 ثوانٍ أثناء العرض (مع توقف عند إخفاء التبويب لتوفير الاستدعاءات)
+  // تحديث تلقائي كل 10 ثوانٍ أثناء العرض (مع توقف عند إخفاء التبويب لتوفير الاستدعاءات)
   useEffect(() => {
     if (!restaurantName) return;
     const t = setInterval(() => {
       if (document.visibilityState === "visible") loadOrders();
-    }, 5_000);
+    }, 10_000);
     return () => clearInterval(t);
   }, [restaurantName, loadOrders]);
 
@@ -236,7 +236,7 @@ export function StaffShell({ slug }: { slug?: string }) {
                 </span>
               ) : null}
             </h1>
-            <p className="text-xs text-cream/60">شاشة الطلبات — تتحدث تلقائيًا كل 5 ثوانٍ</p>
+            <p className="text-xs text-cream/60">شاشة الطلبات — تتحدث تلقائيًا كل 10 ثوانٍ</p>
           </div>
           <button
             type="button"

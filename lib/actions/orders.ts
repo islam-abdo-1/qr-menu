@@ -33,12 +33,25 @@ export type OrderView = {
 };
 
 async function loadOrders(restaurantId: string): Promise<OrderView[]> {
-  const orders = await prisma.order.findMany({
-    where: { restaurantId },
-    include: { items: { select: { id: true, name: true, price: true, qty: true } } },
-  });
+  // استعلامان متوازيان خفيفان:
+  //  - النشط (جديد/في التحضير): يُجلب كاملًا دائمًا — لا يختفي طلب شغال أبدًا
+  //  - المكتمل: آخر 24 ساعة بحد أقصى 150 — يمنع تضخم الاستجابة مع نمو القاعدة
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [active, done] = await Promise.all([
+    prisma.order.findMany({
+      where: { restaurantId, status: { in: ["new", "preparing"] } },
+      include: { items: { select: { id: true, name: true, price: true, qty: true } } },
+    }),
+    prisma.order.findMany({
+      where: { restaurantId, status: "done", createdAt: { gte: since } },
+      include: { items: { select: { id: true, name: true, price: true, qty: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 150,
+    }),
+  ]);
+
   // ترتيب ثابت: الجديد أولًا ثم في التحضير ثم تم التسليم، والأحدث أولًا داخل كل حالة
-  return orders
+  return [...active, ...done]
     .map((o) => ({
       id: o.id,
       number: o.number,
@@ -170,6 +183,16 @@ export async function createOrderAction(
           "delivery"= "DayStat"."delivery" + EXCLUDED."delivery"
       `,
     ]);
+
+    // تنظيف تلقائي: الطلبات المكتملة الأقدم من 30 يومًا — يحافظ على حجم القاعدة
+    // في حدود الـ 500MB المجانية (التقارير اليومية محفوظة في DayStat فلا تتأثر أبدًا)
+    await prisma.order.deleteMany({
+      where: {
+        restaurantId: restaurant.id,
+        status: "done",
+        createdAt: { lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+      },
+    });
     revalidateTag(ORDER_TAG);
 
     return ok({ number, total });

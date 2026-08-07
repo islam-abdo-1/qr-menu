@@ -20,8 +20,21 @@ const amiri = Amiri({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://qr-menu-lyart-gamma.vercel.app",
+  ),
   title: "QR Menu — مطعمك هنا",
   description: "قائمة طعام رقمية بأكواد QR",
+  verification: {
+    google: "Wwor-SRE4siebWFVSC6IxQBIm8TMkWmJpHLZhAfJWik",
+  },
+  openGraph: {
+    title: "QR Menu — مطعمك هنا",
+    description: "قائمة طعام رقمية بأكواد QR",
+    siteName: "QR Menu",
+    locale: "ar_EG",
+    type: "website",
+  },
 };
 
 export const viewport: Viewport = {

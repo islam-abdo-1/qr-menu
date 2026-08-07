@@ -85,7 +85,7 @@ export function AdminShell({ data }: { data: AdminData }) {
     const t = setInterval(() => {
       // لا نستعلم عند إخفاء التبويب — يوفّر استدعاءات كثيرة مع تعدد المطاعم
       if (document.visibilityState === "visible") pollOrders();
-    }, 5_000);
+    }, 20_000);
     return () => clearInterval(t);
   }, [pollOrders]);
 
