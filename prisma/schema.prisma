@@ -24,6 +24,8 @@ model Restaurant {
   categories Category[]
   menuItems  MenuItem[]
   orders     Order[]
+  tables     Table[]
+  dayStats   DayStat[]
 }
 
 model Setting {
@@ -100,13 +102,40 @@ model Order {
   @@index([restaurantId, createdAt(sort: Desc)])
 }
 
+/// إجماليات يومية لكل مطعم — تُحدَّث لحظة إنشاء الطلب (مصدر التقارير)
+model DayStat {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  date         DateTime   @db.Date // يوم المطعم (بتوقيت القاهرة)
+  revenue      Float      @default(0)
+  orders       Int        @default(0)
+  dineIn       Int        @default(0)
+  delivery     Int        @default(0)
+
+  @@unique([restaurantId, date])
+}
+
+/// طاولة داخل المطعم — لكل طاولة رابط QR خاص يملأ رقم الطاولة تلقائيًا
+model Table {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  number       Int
+  createdAt    DateTime   @default(now())
+
+  @@unique([restaurantId, number])
+}
+
 model OrderItem {
   id      String @id @default(uuid())
   orderId String
   order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId  String? // مرجع الصنف الأصلي (لتقارير الأكثر مبيعًا)
   name    String
   price   Float
   qty     Int
 
   @@index([orderId])
+  @@index([itemId])
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, Loader2, Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -49,6 +49,14 @@ export function CartDrawer({
 
   const total = useMemo(() => cartTotal(items), [items]);
   const count = useMemo(() => cartCount(items), [items]);
+
+  // عند مسح رمز QR الخاص بالطاولة (مثل /m/kafy?table=5) نملأ رقم الطاولة تلقائيًا
+  useEffect(() => {
+    if (!open || tableNo) return;
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("table");
+    if (t && /^\d{1,3}$/.test(t)) setTableNo(t);
+  }, [open, tableNo]);
 
   const reset = () => {
     setStep("cart");

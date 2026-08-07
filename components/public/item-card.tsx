@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Heart, Plus, UtensilsCrossed } from "lucide-react";
+import { Flame, Heart, Plus, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
 import type { MenuCategory } from "@/lib/data";
@@ -18,6 +18,7 @@ type Props = {
   onToggleFavorite?: () => void;
   qtyInCart?: number;
   onAdd?: () => void;
+  bestSeller?: boolean;
 };
 
 export function ItemCard({
@@ -31,6 +32,7 @@ export function ItemCard({
   onToggleFavorite,
   qtyInCart = 0,
   onAdd,
+  bestSeller = false,
 }: Props) {
   return (
     <motion.article
@@ -90,6 +92,15 @@ export function ItemCard({
         >
           {formatPrice(item.price, currency, locale)}
         </span>
+        {bestSeller ? (
+          <span
+            className="absolute top-3 flex items-center gap-1 rounded-full border border-gold/50 bg-black/60 px-2.5 py-1 text-[10px] font-black text-gold backdrop-blur"
+            style={{ insetInlineStart: "0.75rem" }}
+          >
+            <Flame className="h-3 w-3" />
+            {locale === "ar" ? "الأكثر مبيعًا" : "Best seller"}
+          </span>
+        ) : null}
         {!item.isAvailable ? (
           <span
             className="absolute top-3 rounded-full border border-border bg-black/60 px-2.5 py-1 text-[10px] font-bold text-cream/80 backdrop-blur"

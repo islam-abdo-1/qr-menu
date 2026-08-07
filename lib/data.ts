@@ -28,11 +28,12 @@ export type MenuData = {
     logoUrl: string | null;
   } | null;
   categories: MenuCategory[];
+  bestSellers: string[];
 };
 
 async function loadRestaurant(restaurantId: string): Promise<MenuData> {
   try {
-    const [settings, categories] = await Promise.all([
+    const [settings, categories, bestSellers] = await Promise.all([
       prisma.setting.findUnique({ where: { restaurantId } }),
       prisma.category.findMany({
         where: { restaurantId },
@@ -51,6 +52,16 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
           },
         },
       }),
+      prisma.$queryRaw<{ itemId: string }[]>`
+        SELECT oi."itemId"
+        FROM "OrderItem" oi
+        JOIN "Order" o ON o."id" = oi."orderId"
+        WHERE o."restaurantId" = ${restaurantId} AND oi."itemId" IS NOT NULL
+          AND o."createdAt" >= ${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)}::timestamptz
+        GROUP BY oi."itemId"
+        ORDER BY SUM(oi."qty") DESC
+        LIMIT 3
+      `,
     ]);
 
     // في القائمة العامة نعرض فقط العناصر المتاحة
@@ -73,11 +84,12 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
           }
         : null,
       categories: visible,
+      bestSellers: bestSellers.map((b) => b.itemId),
     };
   } catch (e) {
     // عدم توقف الصفحة العامة عند تعذّر الاتصال (ISR يعيد البناء تلقائيًا عند التعديل)
     console.error("[data] قاعدة البيانات غير متاحة:", e);
-    return { settings: null, categories: [] };
+    return { settings: null, categories: [], bestSellers: [] };
   }
 }
 
@@ -133,7 +145,7 @@ export async function getAdminData() {
   ]);
 
   return {
-    restaurant: { id: restaurant.id, slug: restaurant.slug },
+    restaurant: { id: restaurant.id, slug: restaurant.slug, staffPin: restaurant.staffPin || null },
     settings: settings
       ? {
           id: settings.id,

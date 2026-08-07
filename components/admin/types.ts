@@ -23,7 +23,7 @@ export type AdminSettings = {
 };
 
 export type AdminData = {
-  restaurant: { id: string; slug: string };
+  restaurant: { id: string; slug: string; staffPin: string | null };
   settings: AdminSettings;
   categories: AdminCategory[];
 };

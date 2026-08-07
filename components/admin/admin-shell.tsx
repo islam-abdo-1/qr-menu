@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  BarChart3,
   ClipboardList,
   ExternalLink,
   LayoutDashboard,
@@ -12,7 +13,9 @@ import {
   QrCode,
   Settings,
   ShoppingBag,
+  Table2,
   Tags,
+  Users,
   UtensilsCrossed,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,14 +28,20 @@ import { CategoriesPanel } from "@/components/admin/categories-panel";
 import { SettingsPanel } from "@/components/admin/settings-panel";
 import { QrPanel } from "@/components/admin/qr-panel";
 import { OrdersPanel } from "@/components/admin/orders-panel";
+import { ReportsPanel } from "@/components/admin/reports-panel";
+import { TablesPanel } from "@/components/admin/tables-panel";
+import { StaffPanel } from "@/components/admin/staff-panel";
 import type { AdminData } from "@/components/admin/types";
 
-type Tab = "orders" | "items" | "categories" | "settings" | "qr";
+type Tab = "orders" | "items" | "categories" | "settings" | "qr" | "reports" | "tables" | "staff";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "orders", label: "الطلبات", icon: ClipboardList },
+  { id: "reports", label: "التقارير", icon: BarChart3 },
   { id: "items", label: "العناصر", icon: ShoppingBag },
   { id: "categories", label: "الأقسام", icon: Tags },
+  { id: "tables", label: "الطاولات", icon: Table2 },
+  { id: "staff", label: "الموظفون", icon: Users },
   { id: "settings", label: "الإعدادات", icon: Settings },
   { id: "qr", label: "رمز QR", icon: QrCode },
 ];
@@ -73,7 +82,10 @@ export function AdminShell({ data }: { data: AdminData }) {
 
   useEffect(() => {
     pollOrders();
-    const t = setInterval(pollOrders, 15_000);
+    const t = setInterval(() => {
+      // لا نستعلم عند إخفاء التبويب — يوفّر استدعاءات كثيرة مع تعدد المطاعم
+      if (document.visibilityState === "visible") pollOrders();
+    }, 20_000);
     return () => clearInterval(t);
   }, [pollOrders]);
 
@@ -216,8 +228,11 @@ export function AdminShell({ data }: { data: AdminData }) {
           </div>
 
           {tab === "orders" && <OrdersPanel orders={orders} onChanged={onChanged} />}
+          {tab === "reports" && <ReportsPanel />}
           {tab === "items" && <ItemsPanel data={data} onChanged={onChanged} />}
           {tab === "categories" && <CategoriesPanel data={data} onChanged={onChanged} />}
+          {tab === "tables" && <TablesPanel slug={data.restaurant.slug} restaurantName={data.settings.restaurantName} />}
+          {tab === "staff" && <StaffPanel staffPin={data.restaurant.staffPin} onSaved={onChanged} />}
           {tab === "settings" && <SettingsPanel settings={data.settings} onSaved={onChanged} />}
           {tab === "qr" && <QrPanel restaurantName={data.settings.restaurantName} menuUrl={menuUrl} />}
         </div>

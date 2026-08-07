@@ -46,6 +46,7 @@ function Ornament({ className }: { className?: string }) {
 
 export function MenuView({ dict, data, locale, langHref, slug }: Props) {
   const categories = data.categories;
+  const bestSellers = data.bestSellers;
   const restaurantName =
     data.settings?.restaurantName || (locale === "ar" ? "قائمة الطعام" : "Menu");
   const currency = data.settings?.currency ?? "EGP";
@@ -463,6 +464,7 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
                       favorite={favIds.has(item.id)}
                       onToggleFavorite={() => handleToggleFavorite(item.id)}
                       qtyInCart={cartQtyOf(item.id)}
+                      bestSeller={bestSellers.includes(item.id)}
                       onAdd={() =>
                         addToCart({
                           id: item.id,

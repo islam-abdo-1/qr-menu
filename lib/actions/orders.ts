@@ -119,6 +119,7 @@ export async function createOrderAction(
         total,
         items: {
           create: parsed.data.items.map((i) => ({
+            itemId: i.itemId,
             name: dbItems.find((d) => d.id === i.itemId)!.name,
             price: priceMap.get(i.itemId)!,
             qty: i.qty,
@@ -127,6 +128,29 @@ export async function createOrderAction(
       },
     });
     revalidateTag(ORDER_TAG);
+
+    // عدّاد المبيعات اليومي (التقارير) — تحديث ذرّي، فشله لا يوقف الطلب
+    try {
+      const cairoDate = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Africa/Cairo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+      await prisma.$executeRaw`
+        INSERT INTO "DayStat" ("id", "restaurantId", "date", "revenue", "orders", "dineIn", "delivery")
+        VALUES (${crypto.randomUUID()}, ${restaurant.id}, ${cairoDate}::date, ${total}, 1,
+          ${parsed.data.type === "dine-in" ? 1 : 0}, ${parsed.data.type === "delivery" ? 1 : 0})
+        ON CONFLICT ("restaurantId", "date") DO UPDATE SET
+          "revenue" = "DayStat"."revenue" + EXCLUDED."revenue",
+          "orders"  = "DayStat"."orders"  + EXCLUDED."orders",
+          "dineIn"  = "DayStat"."dineIn"  + EXCLUDED."dineIn",
+          "delivery"= "DayStat"."delivery" + EXCLUDED."delivery"
+      `;
+    } catch (e) {
+      console.error("[orders] daystat failed:", e);
+    }
+
     return ok({ number: order.number, total: order.total });
   } catch (e) {
     console.error("[orders] create failed:", e);
