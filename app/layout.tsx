@@ -26,7 +26,10 @@ export const metadata: Metadata = {
   title: "QR Menu — مطعمك هنا",
   description: "قائمة طعام رقمية بأكواد QR",
   verification: {
-    google: "Wwor-SRE4siebWFVSC6IxQBIm8TMkWmJpHLZhAfJWik",
+    google: [
+      "ydyxDPhkOymznnW5gw1dx_-IzQ-UbTb2uwVkNqi-gW0",
+      "Wwor-SRE4siebWFVSC6IxQBIm8TMkWmJpHLZhAfJWik",
+    ],
   },
   openGraph: {
     title: "QR Menu — مطعمك هنا",
