@@ -1,10 +1,22 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 import { getMenuData } from "@/lib/data";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { MenuView } from "@/components/public/menu-view";
 
 export const revalidate = 300;
+
+export async function generateStaticParams(): Promise<{ slug: string }[]> {
+  try {
+    const restaurants = await prisma.restaurant.findMany({
+      select: { slug: true },
+    });
+    return restaurants.map((r) => ({ slug: r.slug }));
+  } catch {
+    return [];
+  }
+}
 
 export async function generateMetadata({
   params: { slug },

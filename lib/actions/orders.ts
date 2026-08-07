@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidateTag } from "next/cache";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { orderSchema, staffLoginSchema } from "@/lib/validations";
 import { fromZod, fail, ok, type ActionResult } from "@/lib/actions/helpers";
@@ -103,60 +102,32 @@ export async function createOrderAction(
     );
     if (total <= 0) return fail("السلة فارغة");
 
-    const nextNumber = (await prisma.order.count({ where: { restaurantId: restaurant.id } })) + 1;
+    const [{ nextval: number }] = await prisma.$queryRaw<{ nextval: number }[]>`
+      SELECT nextval('order_number_seq')::int AS nextval
+    `;
 
-    try {
-      const order = await prisma.order.create({
-        data: {
-          restaurantId: restaurant.id,
-          number: nextNumber,
-          type: parsed.data.type,
-          customerName: parsed.data.customerName,
-          tableNo: parsed.data.tableNo?.trim() || null,
-          phone: parsed.data.phone?.trim() || null,
-          address: parsed.data.address?.trim() || null,
-          notes: parsed.data.notes?.trim() || null,
-          total,
-          items: {
-            create: parsed.data.items.map((i) => ({
-              name: dbItems.find((d) => d.id === i.itemId)!.name,
-              price: priceMap.get(i.itemId)!,
-              qty: i.qty,
-            })),
-          },
+    const order = await prisma.order.create({
+      data: {
+        restaurantId: restaurant.id,
+        number,
+        type: parsed.data.type,
+        customerName: parsed.data.customerName,
+        tableNo: parsed.data.tableNo?.trim() || null,
+        phone: parsed.data.phone?.trim() || null,
+        address: parsed.data.address?.trim() || null,
+        notes: parsed.data.notes?.trim() || null,
+        total,
+        items: {
+          create: parsed.data.items.map((i) => ({
+            name: dbItems.find((d) => d.id === i.itemId)!.name,
+            price: priceMap.get(i.itemId)!,
+            qty: i.qty,
+          })),
         },
-      });
-      revalidateTag(ORDER_TAG);
-      return ok({ number: order.number, total: order.total });
-    } catch (e) {
-      // تضارب رقم الطلب (حذف/مسابقات) — أعد المحاولة مرة واحدة برقم جديد
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-        const retryNumber = (await prisma.order.count({ where: { restaurantId: restaurant.id } })) + 1;
-        const order = await prisma.order.create({
-          data: {
-            restaurantId: restaurant.id,
-            number: retryNumber,
-            type: parsed.data.type,
-            customerName: parsed.data.customerName,
-            tableNo: parsed.data.tableNo?.trim() || null,
-            phone: parsed.data.phone?.trim() || null,
-            address: parsed.data.address?.trim() || null,
-            notes: parsed.data.notes?.trim() || null,
-            total,
-            items: {
-              create: parsed.data.items.map((i) => ({
-                name: dbItems.find((d) => d.id === i.itemId)!.name,
-                price: priceMap.get(i.itemId)!,
-                qty: i.qty,
-              })),
-            },
-          },
-        });
-        revalidateTag(ORDER_TAG);
-        return ok({ number: order.number, total: order.total });
-      }
-      throw e;
-    }
+      },
+    });
+    revalidateTag(ORDER_TAG);
+    return ok({ number: order.number, total: order.total });
   } catch (e) {
     console.error("[orders] create failed:", e);
     return fail("حدث خطأ أثناء إرسال الطلب — حاول مجددًا");

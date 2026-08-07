@@ -43,6 +43,8 @@ model Category {
   sortOrder    Int        @default(0)
   createdAt    DateTime   @default(now())
   items        MenuItem[]
+
+  @@index([restaurantId])
 }
 
 model MenuItem {
@@ -58,6 +60,9 @@ model MenuItem {
   category     Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   createdAt    DateTime   @default(now())
   favorites    Favorite[]
+
+  @@index([restaurantId])
+  @@index([categoryId])
 }
 
 /// تفضيلات الزبون — userId = Supabase Auth user id
@@ -90,6 +95,7 @@ model Order {
   items        OrderItem[]
 
   @@unique([restaurantId, number])
+  @@index([restaurantId, createdAt(sort: Desc)])
 }
 
 model OrderItem {
@@ -99,4 +105,6 @@ model OrderItem {
   name    String
   price   Float
   qty     Int
+
+  @@index([orderId])
 }
