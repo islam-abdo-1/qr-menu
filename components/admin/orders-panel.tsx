@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Phone, MapPin, MessageSquare, Clock3, Store, Bike } from "lucide-react";
+import { CheckCircle2, Loader2, Phone, MapPin, MessageSquare, Clock3, Store, Bike } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
@@ -108,6 +108,16 @@ export function OrdersPanel({
                       minute: "2-digit",
                     })}
                   </span>
+                  {o.status === "done" && o.completedAt ? (
+                    <span className="flex items-center gap-1 text-[#3ECF7A]">
+                      <CheckCircle2 className="h-3 w-3" />
+                      تم التسليم في{" "}
+                      {new Date(o.completedAt).toLocaleTimeString("ar-EG", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  ) : null}
                   {o.phone ? (
                     <span className="flex items-center gap-1" dir="ltr">
                       <Phone className="h-3 w-3 text-gold" />

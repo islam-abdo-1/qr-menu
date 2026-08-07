@@ -26,6 +26,7 @@ export type OrderView = {
   status: OrderStatus;
   total: number;
   createdAt: Date;
+  completedAt: Date | null;
   items: { id: string; name: string; price: number; qty: number }[];
 };
 
@@ -47,6 +48,7 @@ async function loadOrders(restaurantId: string): Promise<OrderView[]> {
     status: o.status as OrderStatus,
     total: o.total,
     createdAt: o.createdAt,
+    completedAt: o.completedAt,
     items: o.items,
   }));
 }
@@ -186,7 +188,10 @@ export async function updateOrderStatusAction(
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     if (!order || order.restaurantId !== restaurant.id) return fail("الطلب غير موجود");
 
-    await prisma.order.update({ where: { id: orderId }, data: { status } });
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status, completedAt: status === "done" ? new Date() : null },
+    });
     revalidateTag(ORDER_TAG);
     return ok(null);
   } catch (e) {
@@ -271,7 +276,10 @@ export async function staffUpdateOrderStatusAction(
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     if (!order || order.restaurantId !== restaurant.id) return fail("الطلب غير موجود");
 
-    await prisma.order.update({ where: { id: orderId }, data: { status } });
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status, completedAt: status === "done" ? new Date() : null },
+    });
     revalidateTag(ORDER_TAG);
     return ok(null);
   } catch (e) {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Bell,
   Bike,
+  CheckCircle2,
   ChevronDown,
   Clock3,
   Loader2,
@@ -330,6 +331,16 @@ export function StaffShell() {
                     {o.phone ? ` — ${o.phone}` : ""}
                     {o.notes ? ` — ملاحظة: ${o.notes}` : ""}
                   </p>
+                  {o.status === "done" && o.completedAt ? (
+                    <p className="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-[#3ECF7A]">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      تم التسليم في{" "}
+                      {new Date(o.completedAt).toLocaleTimeString("ar-EG", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  ) : null}
                 </div>
                 <p className="text-lg font-black text-gold">
                   {formatPrice(o.total, "EGP", "ar")}

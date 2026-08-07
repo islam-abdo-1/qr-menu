@@ -84,6 +84,7 @@ model Order {
   address      String?
   notes        String?
   status       String      @default("new") // new | preparing | done
+  completedAt  DateTime? // وقت التسليم (يُملأ عند وصول الحالة إلى done)
   total        Float
   createdAt    DateTime    @default(now())
   items        OrderItem[]
