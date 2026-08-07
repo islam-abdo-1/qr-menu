@@ -87,9 +87,10 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
       bestSellers: bestSellers.map((b) => b.itemId),
     };
   } catch (e) {
-    // عدم توقف الصفحة العامة عند تعذّر الاتصال (ISR يعيد البناء تلقائيًا عند التعديل)
+    // لا نعيد منيو فارغًا عند تعذّر الاتصال — فإعادة البناء الفاشلة تُبقي آخر كاش صالح
+    // لدى Vercel بدل تخزين صفحة فارغة في ISR (منيو فارغ يظهر للعملاء لاحقًا).
     console.error("[data] قاعدة البيانات غير متاحة:", e);
-    return { settings: null, categories: [], bestSellers: [] };
+    throw e;
   }
 }
 

@@ -231,8 +231,8 @@ export function AdminShell({ data }: { data: AdminData }) {
           {tab === "reports" && <ReportsPanel />}
           {tab === "items" && <ItemsPanel data={data} onChanged={onChanged} />}
           {tab === "categories" && <CategoriesPanel data={data} onChanged={onChanged} />}
-          {tab === "tables" && <TablesPanel slug={data.restaurant.slug} restaurantName={data.settings.restaurantName} />}
-          {tab === "staff" && <StaffPanel staffPin={data.restaurant.staffPin} onSaved={onChanged} />}
+          {tab === "tables" && <TablesPanel />}
+          {tab === "staff" && <StaffPanel staffPin={data.restaurant.staffPin} slug={data.restaurant.slug} onSaved={onChanged} />}
           {tab === "settings" && <SettingsPanel settings={data.settings} onSaved={onChanged} />}
           {tab === "qr" && <QrPanel restaurantName={data.settings.restaurantName} menuUrl={menuUrl} />}
         </div>

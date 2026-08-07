@@ -33,7 +33,8 @@ export const settingsSchema = z.object({
   themePrimary: z
     .string()
     .trim()
-    .regex(/^#[0-9a-fA-F]{6}$/, "لون غير صالح (مثال: #C84C21)"),
+    .regex(/^#[0-9a-fA-F]{6}$/, "لون غير صالح (مثال: #C84C21)")
+    .optional(),
   logoUrl: z.string().trim().max(500).optional().nullable(),
 });
 
@@ -77,6 +78,8 @@ export const orderSchema = z.object({
 });
 
 export const staffLoginSchema = z.object({
-  slug: text(1, 100, "المطعم مطلوب"),
-  pin: z.string().trim().min(4, "الكود السري 4 أرقام على الأقل").max(12),
+  pin: z
+    .string()
+    .trim()
+    .regex(/^\d{4}$/, "الكود السري 4 أرقام فقط"),
 });

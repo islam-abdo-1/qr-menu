@@ -1,8 +1,11 @@
 "use server";
 
+import { unstable_cache as cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getOwnerRestaurant } from "@/lib/data";
 import { fail, ok, type ActionResult } from "@/lib/actions/helpers";
+
+const ORDER_TAG = "orders";
 
 export type ReportPeriod = "today" | "7d" | "30d";
 
@@ -58,44 +61,40 @@ function labelFor(dateStr: string): string {
   }).format(d);
 }
 
-export async function getSalesReportAction(
-  period: ReportPeriod,
-): Promise<ActionResult<SalesReport>> {
-  if (!["today", "7d", "30d"].includes(period)) return fail("فترة غير صالحة");
-  try {
-    const restaurant = await getOwnerRestaurant();
-    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
-
+/** حساب التقرير بكاش 30 ثانية — يُمسح تلقائيًا عند إنشاء طلب جديد (tag orders) */
+const loadReport = cache(
+  async (restaurantId: string, period: ReportPeriod): Promise<SalesReport> => {
     const now = new Date();
     const from = new Date(now);
     from.setDate(now.getDate() - (period === "today" ? 0 : period === "7d" ? 6 : 29));
     const fromStr = cairoDate(from);
 
-    const days = await prisma.$queryRaw<
-      { date: Date; revenue: number; orders: number; dineIn: number; delivery: number }[]
-    >`
-      SELECT "date", "revenue", "orders", "dineIn", "delivery"
-      FROM "DayStat"
-      WHERE "restaurantId" = ${restaurant.id} AND "date" >= ${fromStr}::date
-      ORDER BY "date" ASC
-    `;
+    const [days, bestSellers] = await Promise.all([
+      prisma.$queryRaw<
+        { date: Date; revenue: number; orders: number; dineIn: number; delivery: number }[]
+      >`
+        SELECT "date", "revenue", "orders", "dineIn", "delivery"
+        FROM "DayStat"
+        WHERE "restaurantId" = ${restaurantId} AND "date" >= ${fromStr}::date
+        ORDER BY "date" ASC
+      `,
+      prisma.$queryRaw<{ name: string; qty: number; revenue: number }[]>`
+        SELECT oi."name", SUM(oi."qty")::int AS qty, SUM(oi."price" * oi."qty")::float8 AS revenue
+        FROM "OrderItem" oi
+        JOIN "Order" o ON o."id" = oi."orderId"
+        WHERE o."restaurantId" = ${restaurantId} AND o."createdAt" >= ${cairoDayStartUtc(from)}::timestamptz
+        GROUP BY oi."name"
+        ORDER BY qty DESC
+        LIMIT 5
+      `,
+    ]);
 
     const revenue = days.reduce((s, d) => s + d.revenue, 0);
     const orders = days.reduce((s, d) => s + d.orders, 0);
     const dineIn = days.reduce((s, d) => s + d.dineIn, 0);
     const delivery = days.reduce((s, d) => s + d.delivery, 0);
 
-    const bestSellers = await prisma.$queryRaw<{ name: string; qty: number; revenue: number }[]>`
-      SELECT oi."name", SUM(oi."qty")::int AS qty, SUM(oi."price" * oi."qty")::float8 AS revenue
-      FROM "OrderItem" oi
-      JOIN "Order" o ON o."id" = oi."orderId"
-      WHERE o."restaurantId" = ${restaurant.id} AND o."createdAt" >= ${cairoDayStartUtc(from)}::timestamptz
-      GROUP BY oi."name"
-      ORDER BY qty DESC
-      LIMIT 5
-    `;
-
-    return ok({
+    return {
       period,
       totals: {
         revenue,
@@ -109,7 +108,22 @@ export async function getSalesReportAction(
         return { date: iso, label: labelFor(iso), revenue: d.revenue, orders: d.orders };
       }),
       bestSellers,
-    });
+    };
+  },
+  ["qr-menu-sales-report"],
+  { tags: [ORDER_TAG], revalidate: 30 },
+);
+
+export async function getSalesReportAction(
+  period: ReportPeriod,
+): Promise<ActionResult<SalesReport>> {
+  if (!["today", "7d", "30d"].includes(period)) return fail("فترة غير صالحة");
+  try {
+    const restaurant = await getOwnerRestaurant();
+    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+
+    const report = await loadReport(restaurant.id, period);
+    return ok(report);
   } catch (e) {
     console.error("[reports] failed:", e);
     return fail("تعذّر تحميل التقرير");

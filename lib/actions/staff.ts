@@ -1,9 +1,11 @@
 "use server";
 
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { fail, ok, type ActionResult } from "@/lib/actions/helpers";
 import { getOwnerRestaurant } from "@/lib/data";
+import { generateUniqueStaffPin, isStaffPinTaken } from "@/lib/staff-pin";
 
 const staffInputSchema = z.object({
   enabled: z.boolean(),
@@ -28,13 +30,27 @@ export async function updateStaffSettingsAction(input: {
 
     let pin = "";
     if (parsed.data.enabled) {
-      pin = parsed.data.pin ?? String(Math.floor(1000 + Math.random() * 9000));
+      if (parsed.data.pin) {
+        if (await isStaffPinTaken(parsed.data.pin, restaurant.id)) {
+          return fail("هذا الكود مستخدم من مطعم آخر — اختر كودًا مختلفًا");
+        }
+        pin = parsed.data.pin;
+      } else {
+        pin = await generateUniqueStaffPin();
+      }
     }
 
-    await prisma.restaurant.update({
-      where: { id: restaurant.id },
-      data: { staffPin: parsed.data.enabled ? pin : "" },
-    });
+    try {
+      await prisma.restaurant.update({
+        where: { id: restaurant.id },
+        data: { staffPin: parsed.data.enabled ? pin : "" },
+      });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        return fail("هذا الكود مستخدم من مطعم آخر — اختر كودًا مختلفًا");
+      }
+      throw e;
+    }
 
     return ok(parsed.data.enabled ? { pin } : null);
   } catch (e) {

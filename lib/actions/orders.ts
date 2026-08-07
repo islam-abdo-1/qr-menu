@@ -197,35 +197,24 @@ export async function updateOrderStatusAction(
 
 /* ───────────────────── الموظفون (كود سري) ───────────────────── */
 
-/** قائمة المطاعم الظاهرة لشاشة الموظفين (الاسم + slug) — معلومات عامة */
-export async function getStaffRestaurantsAction(): Promise<
-  ActionResult<{ id: string; name: string; slug: string }[]>
-> {
-  try {
-    const restaurants = await prisma.restaurant.findMany({
-      orderBy: { createdAt: "asc" },
-      select: { id: true, name: true, slug: true },
-    });
-    return ok(restaurants);
-  } catch (e) {
-    console.error("[staff] restaurants failed:", e);
-    return fail("تعذّر تحميل المطاعم");
-  }
-}
-
+/**
+ * دخول الموظفين بالكود السري فقط:
+ * - مع slug (من رابط /staff/kafy): يتحقق من الكود لذلك المطعم تحديدًا.
+ * - بدون slug (/staff): يبحث عن المطعم صاحب الكود — فهرس فريد يضمن تطابقًا واحدًا.
+ */
 export async function staffLoginAction(
-  slug: string,
   pin: string,
+  slug?: string,
 ): Promise<ActionResult<{ restaurantName: string; slug: string }>> {
-  const parsed = staffLoginSchema.safeParse({ slug, pin });
+  const parsed = staffLoginSchema.safeParse({ pin });
   if (!parsed.success) {
     const { error } = fromZod(parsed.error);
     return fail(error);
   }
   try {
-    const restaurant = await prisma.restaurant.findUnique({
-      where: { slug: parsed.data.slug },
-    });
+    const restaurant = slug
+      ? await prisma.restaurant.findUnique({ where: { slug } })
+      : await prisma.restaurant.findFirst({ where: { staffPin: parsed.data.pin } });
     if (!restaurant || !restaurant.staffPin) return fail("المطعم غير موجود أو الكود غير مفعّل");
 
     // قفل بعد 5 محاولات خاطئة — يمنع تخمين الكود السري

@@ -7,6 +7,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Link2,
   Loader2,
   Lock,
   RefreshCw,
@@ -21,10 +22,11 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   staffPin: string | null;
+  slug: string;
   onSaved: () => void;
 };
 
-export function StaffPanel({ staffPin, onSaved }: Props) {
+export function StaffPanel({ staffPin, slug, onSaved }: Props) {
   const enabled = staffPin !== null;
   const [show, setShow] = useState(false);
   const [newPin, setNewPin] = useState("");
@@ -35,6 +37,18 @@ export function StaffPanel({ staffPin, onSaved }: Props) {
   const visiblePin = justGenerated ?? staffPin ?? "";
 
   const pinValid = /^\d{4}$/.test(newPin);
+
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
+  const staffUrl = `${siteUrl}/staff/${slug}`;
+
+  async function copyStaffUrl() {
+    try {
+      await navigator.clipboard.writeText(staffUrl);
+      toast.success("تم نسخ رابط شاشة الموظفين");
+    } catch {
+      toast.error("تعذّر النسخ — انسخه يدويًا");
+    }
+  }
 
   async function savePin(pin: string) {
     setBusy(true);
@@ -147,6 +161,33 @@ export function StaffPanel({ staffPin, onSaved }: Props) {
               />
             )}
           </button>
+        </div>
+
+        {/* رابط شاشة الموظفين */}
+        <div className="space-y-2 rounded-2xl border border-border bg-background p-4">
+          <Label>رابط شاشة الموظفين (شاركه مع فريقك)</Label>
+          <div className="flex items-center gap-2">
+            <div
+              dir="ltr"
+              className="flex h-11 flex-1 items-center gap-2 overflow-hidden rounded-xl border border-input bg-background px-3 text-sm font-mono text-muted-foreground"
+            >
+              <Link2 className="h-4 w-4 shrink-0" />
+              <span className="truncate">{staffUrl}</span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-11 w-11 shrink-0"
+              onClick={copyStaffUrl}
+              aria-label="نسخ رابط شاشة الموظفين"
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            من هذا الرابط يفتح الموظف شاشة مطعمك مباشرة ويدخل الكود فقط — بدون اختيار المطعم.
+          </p>
         </div>
 
         {/* الكود الحالي */}

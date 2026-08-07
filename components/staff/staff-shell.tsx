@@ -6,7 +6,6 @@ import {
   Bell,
   Bike,
   CheckCircle2,
-  ChevronDown,
   Clock3,
   Loader2,
   Lock,
@@ -21,7 +20,6 @@ import { formatPrice } from "@/lib/utils";
 import { playOrderBeep, flashTitle } from "@/lib/notify";
 import {
   getStaffOrdersAction,
-  getStaffRestaurantsAction,
   staffLoginAction,
   staffLogoutAction,
   staffUpdateOrderStatusAction,
@@ -35,15 +33,13 @@ const STATUS_META: Record<OrderStatus, { label: string; next: OrderStatus | null
   done: { label: "تم التسليم", next: null, cls: "bg-cream/10 text-cream/60 border-border" },
 };
 
-export function StaffShell() {
+export function StaffShell({ slug }: { slug?: string }) {
   const router = useRouter();
   const [restaurantName, setRestaurantName] = useState<string | null>(null);
   const [orders, setOrders] = useState<OrderView[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [restaurants, setRestaurants] = useState<{ id: string; name: string; slug: string }[]>([]);
-  const [slug, setSlug] = useState("");
   const [pin, setPin] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginBusy, setLoginBusy] = useState(false);
@@ -81,16 +77,8 @@ export function StaffShell() {
   }, []);
 
   useEffect(() => {
-    loadOrders().then((authed) => {
-      if (authed) {
-        setLoading(false);
-        return;
-      }
-      // غير مصرح — حمّل قائمة المطاعم لشاشة الدخول
-      getStaffRestaurantsAction().then((r) => {
-        if (r.ok) setRestaurants(r.data);
-        setLoading(false);
-      });
+    loadOrders().then(() => {
+      setLoading(false);
     });
   }, [loadOrders]);
 
@@ -107,7 +95,7 @@ export function StaffShell() {
     e.preventDefault();
     setLoginError(null);
     setLoginBusy(true);
-    const res = await staffLoginAction(slug, pin);
+    const res = await staffLoginAction(pin, slug);
     setLoginBusy(false);
     if (!res.ok) {
       setLoginError(res.error);
@@ -125,9 +113,6 @@ export function StaffShell() {
     setPin("");
     firstLoad.current = true;
     knownNewIds.current = new Set();
-    getStaffRestaurantsAction().then((r) => {
-      if (r.ok) setRestaurants(r.data);
-    });
   }
 
   async function advance(orderId: string, status: OrderStatus) {
@@ -160,42 +145,22 @@ export function StaffShell() {
             </div>
             <div>
               <h1 className="font-display text-2xl font-bold text-gold-gradient">شاشة الموظفين</h1>
-              <p className="mt-1 text-xs text-cream/65">أدخل بيانات مطعمك والكود السري لعرض الطلبات</p>
+              <p className="mt-1 text-xs text-cream/65">أدخل الكود السري لعرض طلبات المطعم</p>
             </div>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-3" noValidate>
             <div className="relative">
-              <Store className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <div className="relative">
-                <select
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  required
-                  className="h-11 w-full appearance-none rounded-xl border border-input bg-background ps-10 pe-9 text-sm outline-none transition-all focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
-                >
-                  <option value="" disabled>
-                    اختر مطعمك
-                  </option>
-                  {restaurants.map((r) => (
-                    <option key={r.id} value={r.slug}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute end-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              </div>
-            </div>
-
-            <div className="relative">
               <Lock className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="password"
                 inputMode="numeric"
+                autoFocus
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
-                placeholder="الكود السري"
+                placeholder="الكود السري (4 أرقام)"
                 required
+                maxLength={4}
                 className="h-11 w-full rounded-xl border border-input bg-background ps-10 pe-3 text-sm outline-none transition-all focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
               />
             </div>

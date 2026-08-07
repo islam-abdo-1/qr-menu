@@ -7,6 +7,7 @@ import { credentialsSchema, signupSchema } from "@/lib/validations";
 import { ActionResult, fail, fromZod, ok } from "@/lib/actions/helpers";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { generateUniqueStaffPin } from "@/lib/staff-pin";
 
 export async function signInAction(
   email: string,
@@ -169,7 +170,7 @@ export async function registerRestaurantAction(
 
     try {
       const slug = await uniqueSlug(parsed.data.restaurantName);
-      const staffPin = String(Math.floor(1000 + Math.random() * 9000));
+      const staffPin = await generateUniqueStaffPin();
       const restaurant = await prisma.restaurant.create({
         data: {
           slug,
