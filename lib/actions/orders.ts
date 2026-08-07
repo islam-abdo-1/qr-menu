@@ -203,8 +203,36 @@ export async function staffLoginAction(
       where: { slug: parsed.data.slug },
     });
     if (!restaurant || !restaurant.staffPin) return fail("المطعم غير موجود أو الكود غير مفعّل");
-    if (restaurant.staffPin !== parsed.data.pin) return fail("الكود السري غير صحيح");
 
+    // قفل بعد 5 محاولات خاطئة — يمنع تخمين الكود السري
+    const LOCKED_MSG = "محاولات كثيرة — انتظر ٥ دقائق ثم حاول";
+    if (restaurant.pinLockedUntil && restaurant.pinLockedUntil.getTime() > Date.now()) {
+      return fail(LOCKED_MSG);
+    }
+
+    if (restaurant.staffPin !== parsed.data.pin) {
+      const attempts = restaurant.pinFailedAttempts + 1;
+      if (attempts >= 5) {
+        await prisma.restaurant.update({
+          where: { id: restaurant.id },
+          data: { pinFailedAttempts: 0, pinLockedUntil: new Date(Date.now() + 5 * 60 * 1000) },
+        });
+        return fail(LOCKED_MSG);
+      }
+      await prisma.restaurant.update({
+        where: { id: restaurant.id },
+        data: { pinFailedAttempts: attempts },
+      });
+      return fail("الكود السري غير صحيح");
+    }
+
+    // كود صحيح — أعد تعيين العدّاد
+    if (restaurant.pinFailedAttempts > 0 || restaurant.pinLockedUntil) {
+      await prisma.restaurant.update({
+        where: { id: restaurant.id },
+        data: { pinFailedAttempts: 0, pinLockedUntil: null },
+      });
+    }
     await setStaffSession(restaurant.slug);
     return ok({ restaurantName: restaurant.name, slug: restaurant.slug });
   } catch (e) {

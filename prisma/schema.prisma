@@ -17,6 +17,8 @@ model Restaurant {
   name      String
   ownerId   String     @unique // Supabase Auth user id
   staffPin  String     @default("") // كود دخول الموظفين
+  pinFailedAttempts Int @default(0) // محاولات الكود الخاطئة (قفل ضد التخمين)
+  pinLockedUntil    DateTime? // مدة القفل بعد تكرار المحاولات الخاطئة
   createdAt DateTime   @default(now())
   settings  Setting?
   categories Category[]
