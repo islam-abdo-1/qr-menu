@@ -42,3 +42,4 @@ next-env.d.ts
 # dev junk
 *.log
 reffter-js.js
+*.tmp.js
