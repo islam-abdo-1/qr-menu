@@ -78,8 +78,13 @@ export const orderSchema = z.object({
 });
 
 export const staffLoginSchema = z.object({
+  name: text(1, 60, "اسمك مطلوب"),
   pin: z
     .string()
     .trim()
     .regex(/^\d{4}$/, "الكود السري 4 أرقام فقط"),
+});
+
+export const staffNameSchema = z.object({
+  name: text(1, 60, "اسم الموظف مطلوب"),
 });

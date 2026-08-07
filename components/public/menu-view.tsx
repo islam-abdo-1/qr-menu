@@ -496,6 +496,7 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
         slug={slug ?? ""}
         locale={locale}
         currency={currency}
+        tables={data.tables}
         items={cart}
         onUpdateQty={updateQty}
         onRemove={removeFromCart}

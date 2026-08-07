@@ -6,6 +6,14 @@ import { createClient } from "@/lib/supabase/server";
 /** العلامة المستخدمة لكل تجديد بعد التعديل من لوحة الإدارة */
 export const MENU_TAG = "menu";
 
+/** علامة بيانات المالك المخزّنة — تُمسح عند تغيير إعدادات الموظفين */
+export const OWNER_TAG = "owner";
+
+export type MenuTable = {
+  number: number;
+  reserved: boolean;
+};
+
 export type MenuCategory = {
   id: string;
   name: string;
@@ -29,11 +37,12 @@ export type MenuData = {
   } | null;
   categories: MenuCategory[];
   bestSellers: string[];
+  tables: MenuTable[];
 };
 
 async function loadRestaurant(restaurantId: string): Promise<MenuData> {
   try {
-    const [settings, categories, bestSellers] = await Promise.all([
+    const [settings, categories, bestSellers, tables] = await Promise.all([
       prisma.setting.findUnique({ where: { restaurantId } }),
       prisma.category.findMany({
         where: { restaurantId },
@@ -62,6 +71,11 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
         ORDER BY SUM(oi."qty") DESC
         LIMIT 3
       `,
+      prisma.table.findMany({
+        where: { restaurantId },
+        orderBy: { number: "asc" },
+        select: { number: true, reserved: true },
+      }),
     ]);
 
     // في القائمة العامة نعرض فقط العناصر المتاحة
@@ -85,6 +99,7 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
         : null,
       categories: visible,
       bestSellers: bestSellers.map((b) => b.itemId),
+      tables: tables.map((t) => ({ number: t.number, reserved: t.reserved })),
     };
   } catch (e) {
     // لا نعيد منيو فارغًا عند تعذّر الاتصال — فإعادة البناء الفاشلة تُبقي آخر كاش صالح
@@ -109,6 +124,14 @@ export const getMenuData = cache(
   { tags: [MENU_TAG], revalidate: 60 },
 );
 
+/** استعلام المطعم نفسه بكاش قصير — id و slug ثابتان، والتغييرات تُمسح عبر OWNER_TAG */
+const cachedOwner = cache(
+  async (ownerId: string) =>
+    prisma.restaurant.findUnique({ where: { ownerId } }),
+  ["qr-menu-owner"],
+  { tags: [OWNER_TAG], revalidate: 20 },
+);
+
 /** مطعم المالك الحالي من الجلسة — تُستخدم في لوحة الإدارة وكل إجراءات التعديل */
 export async function getOwnerRestaurant() {
   const supabase = createClient();
@@ -116,7 +139,7 @@ export async function getOwnerRestaurant() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
-  return prisma.restaurant.findUnique({ where: { ownerId: user.id } });
+  return cachedOwner(user.id);
 }
 
 /** بيانات حيّة (بدون كاش) — داخل لوحة الإدارة فقط، مقيدة بمطعم المالك */

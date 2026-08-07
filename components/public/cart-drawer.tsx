@@ -8,6 +8,7 @@ import { formatPrice } from "@/lib/utils";
 import type { CartItem } from "@/lib/cart";
 import { cartCount, cartTotal } from "@/lib/cart";
 import { createOrderAction } from "@/lib/actions/orders";
+import type { MenuTable } from "@/lib/data";
 
 type Props = {
   open: boolean;
@@ -15,6 +16,7 @@ type Props = {
   slug: string;
   locale: "ar" | "en";
   currency: string;
+  tables: MenuTable[];
   items: CartItem[];
   onUpdateQty: (itemId: string, qty: number) => void;
   onRemove: (itemId: string) => void;
@@ -31,6 +33,7 @@ export function CartDrawer({
   slug,
   locale,
   currency,
+  tables,
   items,
   onUpdateQty,
   onRemove,
@@ -50,13 +53,16 @@ export function CartDrawer({
   const total = useMemo(() => cartTotal(items), [items]);
   const count = useMemo(() => cartCount(items), [items]);
 
-  // عند مسح رمز QR الخاص بالطاولة (مثل /m/kafy?table=5) نملأ رقم الطاولة تلقائيًا
+  // عند مسح رمز QR الخاص بالطاولة (مثل /m/kafy?table=5) نملأ الطاولة تلقائيًا — فقط إن كانت مسجلة
   useEffect(() => {
-    if (!open || tableNo) return;
+    if (!open || tableNo || tables.length === 0) return;
     const params = new URLSearchParams(window.location.search);
     const t = params.get("table");
-    if (t && /^\d{1,3}$/.test(t)) setTableNo(t);
-  }, [open, tableNo]);
+    if (t && /^\d{1,3}$/.test(t)) {
+      const n = Number.parseInt(t, 10);
+      if (tables.some((tb) => tb.number === n)) setTableNo(t);
+    }
+  }, [open, tableNo, tables]);
 
   const reset = () => {
     setStep("cart");
@@ -267,14 +273,44 @@ export function CartDrawer({
                     className="h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm outline-none transition-all focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
                   />
                   {type === "dine-in" ? (
-                    <input
-                      value={tableNo}
-                      onChange={(e) => setTableNo(e.target.value)}
-                      placeholder={t(locale, "رقم الطاولة", "Table number")}
-                      required
-                      inputMode="numeric"
-                      className="h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm outline-none transition-all focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
-                    />
+                    <div className="space-y-1.5">
+                      <select
+                        value={tableNo}
+                        onChange={(e) => setTableNo(e.target.value)}
+                        required
+                        className="h-11 w-full appearance-none rounded-xl border border-input bg-background px-3.5 text-sm outline-none transition-all focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
+                      >
+                        <option value="" disabled>
+                          {t(locale, "اختر رقم الطاولة", "Choose your table")}
+                        </option>
+                        {tables.map((tb) => (
+                          <option
+                            key={tb.number}
+                            value={String(tb.number)}
+                            disabled={tb.reserved}
+                          >
+                            {t(
+                              locale,
+                              tb.reserved
+                                ? `طاولة ${tb.number} — محجوزة`
+                                : `طاولة ${tb.number}`,
+                              tb.reserved
+                                ? `Table ${tb.number} — reserved`
+                                : `Table ${tb.number}`,
+                            )}
+                          </option>
+                        ))}
+                      </select>
+                      {tables.length === 0 ? (
+                        <p className="text-xs text-cream/55">
+                          {t(
+                            locale,
+                            "لا توجد طاولات متاحة حاليًا — اختر «توصيل» أو انتظر",
+                            "No tables available right now — choose delivery or wait",
+                          )}
+                        </p>
+                      ) : null}
+                    </div>
                   ) : (
                     <>
                       <input

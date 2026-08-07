@@ -182,6 +182,10 @@ export async function registerRestaurantAction(
       await prisma.setting.create({
         data: { restaurantName: parsed.data.restaurantName, restaurantId: restaurant.id },
       });
+      // موظف افتراضي بنفس اسم المطعم — يمكن إدارته من لوحة الموظفين
+      await prisma.staff.create({
+        data: { restaurantId: restaurant.id, name: parsed.data.restaurantName },
+      });
       return ok({ slug });
     } catch (e) {
       // فشل إنشاء بيانات المطعم — احذف حساب Supabase حتى لا يبقى حسابًا يتيمًا

@@ -85,7 +85,7 @@ export function AdminShell({ data }: { data: AdminData }) {
     const t = setInterval(() => {
       // لا نستعلم عند إخفاء التبويب — يوفّر استدعاءات كثيرة مع تعدد المطاعم
       if (document.visibilityState === "visible") pollOrders();
-    }, 20_000);
+    }, 5_000);
     return () => clearInterval(t);
   }, [pollOrders]);
 
@@ -114,6 +114,11 @@ export function AdminShell({ data }: { data: AdminData }) {
 
   const onChanged = () => {
     router.refresh();
+    pollOrders();
+  };
+
+  // تغيير حالة طلب لا يغيّر بيانات السيرفر الثابتة — تحديث خفيف عبر الاستعلام فقط
+  const onOrderStatusChanged = () => {
     pollOrders();
   };
 
@@ -227,7 +232,9 @@ export function AdminShell({ data }: { data: AdminData }) {
             </div>
           </div>
 
-          {tab === "orders" && <OrdersPanel orders={orders} onChanged={onChanged} />}
+          {tab === "orders" && (
+            <OrdersPanel orders={orders} onStatusChanged={onOrderStatusChanged} />
+          )}
           {tab === "reports" && <ReportsPanel />}
           {tab === "items" && <ItemsPanel data={data} onChanged={onChanged} />}
           {tab === "categories" && <CategoriesPanel data={data} onChanged={onChanged} />}

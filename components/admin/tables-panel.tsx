@@ -5,7 +5,14 @@ import { toast } from "sonner";
 import { Loader2, Plus, Table2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { addTableAction, listTablesAction, removeTableAction, type TableView } from "@/lib/actions/tables";
+import {
+  addTableAction,
+  listTablesAction,
+  removeTableAction,
+  toggleTableReservedAction,
+  type TableView,
+} from "@/lib/actions/tables";
+import { cn } from "@/lib/utils";
 
 export function TablesPanel() {
   const [tables, setTables] = useState<TableView[] | null>(null);
@@ -52,6 +59,18 @@ export function TablesPanel() {
     toast.success("تم حذف الطاولة");
   }
 
+  async function handleToggleReserved(id: string) {
+    setBusy(true);
+    const res = await toggleTableReservedAction(id);
+    setBusy(false);
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    setTables(res.data);
+    toast.success("تم تحديث حالة الطاولة");
+  }
+
   if (!tables) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-24 text-cream/60">
@@ -69,7 +88,7 @@ export function TablesPanel() {
           طاولاتك
         </h3>
         <p className="mt-1 text-xs leading-relaxed text-cream/60">
-          أضف أرقام الطاولات لتظهر مع كل طلب داخل المطعم — ويُعبّأ رقم الطاولة تلقائيًا في الطلب.
+          أضف أرقام الطاولات — العميل يختار منها عند الطلب، وحدّد المحجوز منها «محجوز».
         </p>
         <form onSubmit={handleAdd} className="mt-4 flex gap-2">
           <Input
@@ -99,9 +118,22 @@ export function TablesPanel() {
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {tables.map((t) => (
-            <div key={t.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+            <div
+              key={t.id}
+              className={cn(
+                "rounded-2xl border bg-card p-4 shadow-soft",
+                t.reserved ? "border-red-500/40 bg-red-500/[0.04]" : "border-border",
+              )}
+            >
               <div className="flex items-center justify-between">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-gold to-[#a87a2b] font-display text-base font-black text-background">
+                <span
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-xl font-display text-base font-black",
+                    t.reserved
+                      ? "bg-red-500/15 text-red-400"
+                      : "bg-gradient-to-br from-gold to-[#a87a2b] text-background",
+                  )}
+                >
                   {t.number}
                 </span>
                 <button
@@ -115,6 +147,20 @@ export function TablesPanel() {
                 </button>
               </div>
               <p className="mt-3 text-xs text-cream/60">طاولة {t.number}</p>
+              <button
+                type="button"
+                onClick={() => handleToggleReserved(t.id)}
+                disabled={busy}
+                className={cn(
+                  "mt-3 flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border text-[11px] font-black transition-all active:scale-[0.98] disabled:opacity-60",
+                  t.reserved
+                    ? "border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                    : "border-emerald-500/40 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20",
+                )}
+                aria-label={`تبديل حالة الطاولة ${t.number}`}
+              >
+                {t.reserved ? "محجوز — اضغط للتفريغ" : "متاح — اضغط للحجز"}
+              </button>
             </div>
           ))}
         </div>

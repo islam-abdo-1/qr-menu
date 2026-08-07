@@ -12,6 +12,7 @@ import {
   LogOut,
   RefreshCw,
   Store,
+  Users,
   UtensilsCrossed,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -36,10 +37,12 @@ const STATUS_META: Record<OrderStatus, { label: string; next: OrderStatus | null
 export function StaffShell({ slug }: { slug?: string }) {
   const router = useRouter();
   const [restaurantName, setRestaurantName] = useState<string | null>(null);
+  const [staffName, setStaffName] = useState<string | null>(null);
   const [orders, setOrders] = useState<OrderView[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [name, setName] = useState("");
   const [pin, setPin] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginBusy, setLoginBusy] = useState(false);
@@ -51,6 +54,7 @@ export function StaffShell({ slug }: { slug?: string }) {
     const res = await getStaffOrdersAction();
     if (!res.ok) return false;
     setRestaurantName(res.data.restaurantName);
+    setStaffName(res.data.staffName);
     setOrders(res.data.orders);
 
     // تنبيه عند وصول طلب جديد (بعد التحميل الأول فقط)
@@ -82,12 +86,12 @@ export function StaffShell({ slug }: { slug?: string }) {
     });
   }, [loadOrders]);
 
-  // تحديث تلقائي كل 20 ثانية أثناء العرض (مع توقف عند إخفاء التبويب لتوفير الاستدعاءات)
+  // تحديث تلقائي كل 5 ثوانٍ أثناء العرض (مع توقف عند إخفاء التبويب لتوفير الاستدعاءات)
   useEffect(() => {
     if (!restaurantName) return;
     const t = setInterval(() => {
       if (document.visibilityState === "visible") loadOrders();
-    }, 20_000);
+    }, 5_000);
     return () => clearInterval(t);
   }, [restaurantName, loadOrders]);
 
@@ -95,13 +99,14 @@ export function StaffShell({ slug }: { slug?: string }) {
     e.preventDefault();
     setLoginError(null);
     setLoginBusy(true);
-    const res = await staffLoginAction(pin, slug);
+    const res = await staffLoginAction(name, pin, slug);
     setLoginBusy(false);
     if (!res.ok) {
       setLoginError(res.error);
       return;
     }
     setRestaurantName(res.data.restaurantName);
+    setStaffName(res.data.name);
     await loadOrders();
   }
 
@@ -109,7 +114,9 @@ export function StaffShell({ slug }: { slug?: string }) {
     await staffLogoutAction();
     router.refresh();
     setRestaurantName(null);
+    setStaffName(null);
     setOrders(null);
+    setName("");
     setPin("");
     firstLoad.current = true;
     knownNewIds.current = new Set();
@@ -145,17 +152,30 @@ export function StaffShell({ slug }: { slug?: string }) {
             </div>
             <div>
               <h1 className="font-display text-2xl font-bold text-gold-gradient">شاشة الموظفين</h1>
-              <p className="mt-1 text-xs text-cream/65">أدخل الكود السري لعرض طلبات المطعم</p>
+              <p className="mt-1 text-xs text-cream/65">أدخل اسمك والكود السري لعرض طلبات المطعم</p>
             </div>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-3" noValidate>
             <div className="relative">
+              <Users className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="اسمك"
+                required
+                maxLength={60}
+                className="h-11 w-full rounded-xl border border-input bg-background ps-10 pe-3 text-sm outline-none transition-all focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
+              />
+            </div>
+
+            <div className="relative">
               <Lock className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="password"
                 inputMode="numeric"
-                autoFocus
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
                 placeholder="الكود السري (4 أرقام)"
@@ -198,6 +218,11 @@ export function StaffShell({ slug }: { slug?: string }) {
           <div className="min-w-0 flex-1">
             <h1 className="flex items-center gap-2 text-sm font-black text-cream">
               {restaurantName}
+              {staffName ? (
+                <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-black text-gold">
+                  {staffName}
+                </span>
+              ) : null}
               {newCount > 0 ? (
                 <span className="flex items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-black text-gold">
                   <Bell className="h-3 w-3 animate-pulse" />
@@ -211,7 +236,7 @@ export function StaffShell({ slug }: { slug?: string }) {
                 </span>
               ) : null}
             </h1>
-            <p className="text-xs text-cream/60">شاشة الطلبات — تتحدث تلقائيًا كل 20 ثانية</p>
+            <p className="text-xs text-cream/60">شاشة الطلبات — تتحدث تلقائيًا كل 5 ثوانٍ</p>
           </div>
           <button
             type="button"

@@ -15,10 +15,10 @@ const STATUS_META: Record<OrderStatus, { label: string; next: OrderStatus | null
 
 export function OrdersPanel({
   orders,
-  onChanged,
+  onStatusChanged,
 }: {
   orders: OrderView[] | null;
-  onChanged: () => void;
+  onStatusChanged: () => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -30,7 +30,7 @@ export function OrdersPanel({
       toast.error(res.error);
       return;
     }
-    onChanged();
+    onStatusChanged();
   }
 
   if (!orders) {
@@ -137,6 +137,11 @@ export function OrdersPanel({
                     </span>
                   ) : null}
                 </p>
+                {o.staffName ? (
+                  <p className="mt-1 text-[11px] font-bold text-cream/50">
+                    آخر من تعامل مع الطلب: {o.staffName}
+                  </p>
+                ) : null}
               </div>
               <p className="text-lg font-black text-gold">
                 {formatPrice(o.total, "EGP", "ar")}

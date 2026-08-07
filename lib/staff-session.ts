@@ -20,9 +20,11 @@ function safeEqual(a: string, b: string) {
   return ba.length === bb.length && timingSafeEqual(ba, bb);
 }
 
-export async function setStaffSession(slug: string) {
+export type StaffSession = { slug: string; name: string };
+
+export async function setStaffSession(session: StaffSession) {
   const expires = Date.now() + TTL_MS;
-  const payload = `${slug}.${expires}`;
+  const payload = `${session.slug}.${encodeURIComponent(session.name)}.${expires}`;
   const token = `${payload}.${sign(payload)}`;
   const store = await cookies();
   store.set(COOKIE, token, {
@@ -39,19 +41,19 @@ export async function clearStaffSession() {
   store.delete(COOKIE);
 }
 
-/** slug المطعم صاحب الجلسة أو null */
-export async function getStaffSession(): Promise<string | null> {
+/** جلسة الموظف الحالية أو null */
+export async function getStaffSession(): Promise<StaffSession | null> {
   const store = await cookies();
   const token = store.get(COOKIE)?.value;
   if (!token) return null;
 
   const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  const payload = `${parts[0]}.${parts[1]}`;
-  if (!safeEqual(sign(payload), parts[2])) return null;
+  if (parts.length !== 4) return null;
+  const payload = `${parts[0]}.${parts[1]}.${parts[2]}`;
+  if (!safeEqual(sign(payload), parts[3])) return null;
 
-  const expires = Number(parts[1]);
+  const expires = Number(parts[2]);
   if (!Number.isFinite(expires) || expires < Date.now()) return null;
 
-  return parts[0];
+  return { slug: parts[0], name: decodeURIComponent(parts[1]) };
 }

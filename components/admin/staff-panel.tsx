@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   Check,
@@ -10,14 +10,23 @@ import {
   Link2,
   Loader2,
   Lock,
+  Plus,
   RefreshCw,
   Save,
   ShieldCheck,
+  Trash2,
+  UserPlus,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { updateStaffSettingsAction } from "@/lib/actions/staff";
+import {
+  addStaffAction,
+  listStaffAction,
+  removeStaffAction,
+  updateStaffSettingsAction,
+  type StaffView,
+} from "@/lib/actions/staff";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -34,12 +43,25 @@ export function StaffPanel({ staffPin, slug, onSaved }: Props) {
   const [toggling, setToggling] = useState(false);
   const [justGenerated, setJustGenerated] = useState<string | null>(null);
 
+  const [staff, setStaff] = useState<StaffView[] | null>(null);
+  const [staffName, setStaffName] = useState("");
+  const [staffBusy, setStaffBusy] = useState(false);
+
   const visiblePin = justGenerated ?? staffPin ?? "";
 
   const pinValid = /^\d{4}$/.test(newPin);
 
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
   const staffUrl = `${siteUrl}/staff/${slug}`;
+
+  const loadStaff = useCallback(async () => {
+    const res = await listStaffAction();
+    if (res.ok) setStaff(res.data);
+  }, []);
+
+  useEffect(() => {
+    loadStaff();
+  }, [loadStaff]);
 
   async function copyStaffUrl() {
     try {
@@ -104,6 +126,33 @@ export function StaffPanel({ staffPin, slug, onSaved }: Props) {
     }
   }
 
+  async function handleAddStaff(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!staffName.trim()) return;
+    setStaffBusy(true);
+    const res = await addStaffAction(staffName.trim());
+    setStaffBusy(false);
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    setStaff(res.data);
+    setStaffName("");
+    toast.success("تمت إضافة الموظف");
+  }
+
+  async function handleRemoveStaff(id: string) {
+    setStaffBusy(true);
+    const res = await removeStaffAction(id);
+    setStaffBusy(false);
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    setStaff(res.data);
+    toast.success("تم حذف الموظف");
+  }
+
   const masked = useMemo(() => "•".repeat(visiblePin.length), [visiblePin]);
 
   return (
@@ -113,7 +162,7 @@ export function StaffPanel({ staffPin, slug, onSaved }: Props) {
         <div>
           <h2 className="text-lg font-black">الموظفون — فريق استقبال الطلبات</h2>
           <p className="text-sm text-muted-foreground">
-            كود واحد مشترك لفريقك يفتح شاشة الطلبات من /staff
+            كل موظف يدخل باسمه + الكود المشترك، واسمه يظهر بجانب الطلبات التي تعامل معها
           </p>
         </div>
       </div>
@@ -136,7 +185,7 @@ export function StaffPanel({ staffPin, slug, onSaved }: Props) {
               </p>
               <p className="text-xs text-muted-foreground">
                 {enabled
-                  ? "أي شخص يعرف الكود يستطيع فتح /staff ومتابعة الطلبات"
+                  ? "الموظف المسجّل يفتح /staff باسمه والكود المشترك"
                   : "شاشة /staff ترفض الدخول حاليًا"}
               </p>
             </div>
@@ -163,6 +212,65 @@ export function StaffPanel({ staffPin, slug, onSaved }: Props) {
           </button>
         </div>
 
+        {/* قائمة الموظفين */}
+        <div className="space-y-3 rounded-2xl border border-border bg-background p-4">
+          <div className="flex items-center gap-2">
+            <UserPlus className="h-4 w-4 text-primary" />
+            <Label>الموظفون — أضف أسماء فريقك (يدخل كل واحد باسمه)</Label>
+          </div>
+
+          <form onSubmit={handleAddStaff} className="flex gap-2">
+            <input
+              value={staffName}
+              onChange={(e) => setStaffName(e.target.value)}
+              placeholder="اسم الموظف (مثال: أحمد)"
+              required
+              maxLength={60}
+              className="h-11 flex-1 rounded-xl border border-input bg-background px-3.5 text-sm outline-none transition-all focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
+            />
+            <Button type="submit" disabled={staffBusy} className="h-11 rounded-xl px-5">
+              {staffBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              إضافة
+            </Button>
+          </form>
+
+          {staff === null ? (
+            <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              جارٍ تحميل الموظفين...
+            </div>
+          ) : staff.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+              لا يوجد موظفون بعد — أضف اسمًا بالأعلى ليتمكن من الدخول بالاسم والكود.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {staff.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-2.5"
+                >
+                  <span className="flex items-center gap-2 text-sm font-bold">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gold/15 text-gold">
+                      <Users className="h-3.5 w-3.5" />
+                    </span>
+                    {s.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveStaff(s.id)}
+                    disabled={staffBusy}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-cream/60 transition-colors hover:border-red-500/50 hover:text-red-400"
+                    aria-label={`حذف الموظف ${s.name}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         {/* رابط شاشة الموظفين */}
         <div className="space-y-2 rounded-2xl border border-border bg-background p-4">
           <Label>رابط شاشة الموظفين (شاركه مع فريقك)</Label>
@@ -186,14 +294,14 @@ export function StaffPanel({ staffPin, slug, onSaved }: Props) {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            من هذا الرابط يفتح الموظف شاشة مطعمك مباشرة ويدخل الكود فقط — بدون اختيار المطعم.
+            من هذا الرابط يفتح الموظف شاشة مطعمك مباشرة ويدخل اسمه والكود فقط — بدون اختيار المطعم.
           </p>
         </div>
 
         {/* الكود الحالي */}
         {enabled ? (
           <div className="space-y-2 rounded-2xl border border-gold/20 bg-gold/5 p-4">
-            <Label>الكود السري الحالي للفريق</Label>
+            <Label>الكود السري المشترك للفريق</Label>
             <div className="flex items-center gap-2">
               <div className="flex h-11 flex-1 items-center rounded-xl border border-input bg-background px-3 font-mono text-lg tracking-[0.3em]">
                 {show ? visiblePin : masked}
@@ -237,7 +345,9 @@ export function StaffPanel({ staffPin, slug, onSaved }: Props) {
                 كود جديد: {justGenerated} — احفظه الآن
               </p>
             ) : (
-              <p className="text-xs text-muted-foreground">مشاركة الكود سرية بينك وبين فريقك</p>
+              <p className="text-xs text-muted-foreground">
+                نفس الكود لجميع الموظفين — الاسم هو ما يميّز كل موظف في اللوحة
+              </p>
             )}
           </div>
         ) : null}

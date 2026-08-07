@@ -26,6 +26,7 @@ model Restaurant {
   orders     Order[]
   tables     Table[]
   dayStats   DayStat[]
+  staff      Staff[]
 }
 
 model Setting {
@@ -93,6 +94,7 @@ model Order {
   address      String?
   notes        String?
   status       String      @default("new") // new | preparing | done
+  staffName    String? // اسم الموظف الذي تعامل مع الطلب — يظهر في لوحة الإدارة فقط
   completedAt  DateTime? // وقت التسليم (يُملأ عند وصول الحالة إلى done)
   total        Float
   createdAt    DateTime    @default(now())
@@ -116,12 +118,24 @@ model DayStat {
   @@unique([restaurantId, date])
 }
 
+/// موظف مطعم — الدخول باسمه مع الكود السري المشترك للمطعم
+model Staff {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  createdAt    DateTime   @default(now())
+
+  @@index([restaurantId])
+}
+
 /// طاولة داخل المطعم — لكل طاولة رابط QR خاص يملأ رقم الطاولة تلقائيًا
 model Table {
   id           String     @id @default(cuid())
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   number       Int
+  reserved     Boolean    @default(false) // متاح/محجوز
   createdAt    DateTime   @default(now())
 
   @@unique([restaurantId, number])
