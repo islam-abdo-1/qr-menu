@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Loader2, Phone, MapPin, MessageSquare, Clock3, Store, Bike } from "lucide-react";
+import { CheckCircle2, Download, Loader2, Phone, MapPin, MessageSquare, Clock3, Store, Bike } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
@@ -33,32 +33,48 @@ export function OrdersPanel({
     onStatusChanged();
   }
 
-  if (!orders) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-24 text-cream/60">
-        <Loader2 className="h-8 w-8 animate-spin text-gold" />
-        <p className="text-sm">جارٍ تحميل الطلبات...</p>
-      </div>
-    );
-  }
-
-  if (orders.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-dashed border-border bg-card/50 py-24 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gold/10 text-gold">
-          <Store className="h-8 w-8" />
-        </div>
-        <div>
-          <p className="font-bold text-cream">لا توجد طلبات بعد</p>
-          <p className="mt-1 text-sm text-cream/60">
-            عندما يطلب زبون من منيوك سيظهر الطلب هنا فورًا
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
+    <>
+      {/* تصدير بيانات العملاء — ملاحظة هامة: زر تحميل مباشر عبر رابط API */}
+      <div className="mb-6 flex flex-col gap-4 rounded-3xl border border-gold/20 bg-card p-5 shadow-soft sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gold/15 text-gold">
+            <Download className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-sm font-black">بيانات العملاء</p>
+            <p className="text-xs text-muted-foreground">
+              نزّل أسماء وأرقام عملاء مطعمك (CSV) — جاهز لحملات WhatsApp
+            </p>
+          </div>
+        </div>
+        <a
+          href="/api/admin/export-customers"
+          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-gold to-[#a87a2b] px-5 text-sm font-black text-background shadow-[0_10px_30px_-10px_rgba(212,168,83,0.5)] transition-all hover:brightness-110 active:scale-[0.98]"
+        >
+          <Download className="h-4 w-4" />
+          تحميل CSV
+        </a>
+      </div>
+
+      {!orders ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-24 text-cream/60">
+          <Loader2 className="h-8 w-8 animate-spin text-gold" />
+          <p className="text-sm">جارٍ تحميل الطلبات...</p>
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-dashed border-border bg-card/50 py-24 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gold/10 text-gold">
+            <Store className="h-8 w-8" />
+          </div>
+          <div>
+            <p className="font-bold text-cream">لا توجد طلبات بعد</p>
+            <p className="mt-1 text-sm text-cream/60">
+              عندما يطلب زبون من منيوك سيظهر الطلب هنا فورًا
+            </p>
+          </div>
+        </div>
+      ) : (
     <div className="space-y-4">
       {orders.map((o) => {
         const meta = STATUS_META[o.status];
@@ -154,7 +170,14 @@ export function OrdersPanel({
                   <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-gold/15 px-1 text-[11px] font-black text-gold">
                     {i.qty}
                   </span>
-                  <span className="text-cream/85">{i.name}</span>
+                  <span className="text-cream/85">
+                    {i.name}
+                    {i.sizeCode ? (
+                      <span className="ms-1.5 rounded-md border border-gold/40 bg-gold/10 px-1.5 py-0.5 text-[10px] font-black text-gold">
+                        {i.sizeCode}
+                      </span>
+                    ) : null}
+                  </span>
                   <span className="ms-auto text-xs text-cream/50">
                     {formatPrice(i.price * i.qty, "EGP", "ar")}
                   </span>
@@ -178,6 +201,8 @@ export function OrdersPanel({
           </div>
         );
       })}
-    </div>
+      </div>
+      )}
+    </>
   );
 }

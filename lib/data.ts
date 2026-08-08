@@ -15,6 +15,11 @@ export type MenuTable = {
   reserved: boolean;
 };
 
+export type MenuItemSize = {
+  sizeCode: string;
+  price: number;
+};
+
 export type MenuCategory = {
   id: string;
   name: string;
@@ -24,6 +29,8 @@ export type MenuCategory = {
     name: string;
     description: string | null;
     price: number;
+    discountPercentage: number | null;
+    sizes: MenuItemSize[];
     imageUrl: string | null;
     isAvailable: boolean;
   }[];
@@ -56,6 +63,8 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
               name: true,
               description: true,
               price: true,
+              discountPercentage: true,
+              sizes: { select: { sizeCode: true, price: true } },
               imageUrl: true,
               isAvailable: true,
             },
@@ -205,6 +214,8 @@ export async function getAdminData() {
             name: true,
             description: true,
             price: true,
+            discountPercentage: true,
+            sizes: { select: { sizeCode: true, price: true } },
             imageUrl: true,
             isAvailable: true,
           },

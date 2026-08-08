@@ -7,7 +7,19 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default function LoginPage() {
+/** مسار داخلي آمن فقط — يمنع فتح redirect خارجي عبر الرابط؟ */
+function safeNext(value: string | null | undefined): string | null {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
+  return value;
+}
+
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams?: { next?: string };
+}) {
+  const next = safeNext(searchParams?.next) ?? "/admin";
+
   return (
     <main className="texture-dots relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10">
       {/* زخارف خلفية */}
@@ -16,7 +28,7 @@ export default function LoginPage() {
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" aria-hidden />
 
       <div className="relative w-full max-w-md">
-        <LoginForm />
+        <LoginForm next={next} />
       </div>
     </main>
   );

@@ -1,8 +1,15 @@
+export type AdminItemSize = {
+  sizeCode: string;
+  price: number;
+};
+
 export type AdminItem = {
   id: string;
   name: string;
   description: string | null;
   price: number;
+  discountPercentage: number | null;
+  sizes: AdminItemSize[];
   imageUrl: string | null;
   isAvailable: boolean;
 };

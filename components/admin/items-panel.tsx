@@ -167,8 +167,18 @@ export function ItemsPanel({ data, onChanged }: Props) {
                             بدون وصف
                           </p>
                         )}
-                        <p className="mt-0.5 text-xs font-bold text-primary">
+                        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs font-bold text-primary">
                           {formatPrice(item.price, data.settings.currency)}
+                          {item.discountPercentage ? (
+                            <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-black text-destructive">
+                              خصم {item.discountPercentage}%
+                            </span>
+                          ) : null}
+                          {item.sizes.length > 0 ? (
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-black text-muted-foreground">
+                              {item.sizes.map((s) => s.sizeCode).join(" / ")}
+                            </span>
+                          ) : null}
                         </p>
                       </div>
                     </div>

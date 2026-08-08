@@ -8,7 +8,7 @@ import { Loader2, Lock, Mail, ShieldCheck, UtensilsCrossed } from "lucide-react"
 import { signInAction } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils";
 
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,7 +23,8 @@ export function LoginForm() {
     setLoading(true);
     const res = await signInAction(email, password);
     if (res.ok) {
-      router.push("/admin");
+      // العودة إلى الصفحة التي كان يحاول الوصول إليها (من ?next) وليس /admin دائمًا
+      router.push(next ?? "/admin");
       router.refresh();
     } else {
       setError(res.error);

@@ -43,3 +43,7 @@ next-env.d.ts
 *.log
 reffter-js.js
 *.tmp.js
+
+# next-pwa generated artifacts (regenerated on every build)
+/public/sw.js
+/public/workbox-*.js

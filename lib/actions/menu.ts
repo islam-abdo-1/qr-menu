@@ -143,6 +143,8 @@ export type MenuItemInput = {
   categoryId: string;
   imageUrl?: string | null;
   isAvailable?: boolean;
+  discountPercentage?: number | null;
+  sizes?: { sizeCode: string; price: number | string }[];
 };
 
 export async function createMenuItemAction(
@@ -169,6 +171,10 @@ export async function createMenuItemAction(
         restaurantId: restaurant.id,
         imageUrl: parsed.data.imageUrl || null,
         isAvailable: parsed.data.isAvailable ?? true,
+        discountPercentage: parsed.data.discountPercentage || null,
+        sizes: parsed.data.sizes?.length
+          ? { create: parsed.data.sizes.map((s) => ({ sizeCode: s.sizeCode, price: s.price })) }
+          : undefined,
       },
     });
     bumpMenuCache();
@@ -211,6 +217,12 @@ export async function updateMenuItemAction(
         categoryId: parsed.data.categoryId,
         imageUrl: parsed.data.imageUrl || null,
         isAvailable: parsed.data.isAvailable ?? existing.isAvailable,
+        discountPercentage: parsed.data.discountPercentage || null,
+        // استبدال كامل للمقاسات: حذف القديمة وإنشاء الجديدة — تبقى فقط ما اختاره الأدمن
+        sizes: {
+          deleteMany: {},
+          create: parsed.data.sizes?.map((s) => ({ sizeCode: s.sizeCode, price: s.price })) ?? [],
+        },
       },
     });
     bumpMenuCache();

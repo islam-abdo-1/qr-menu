@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Amiri, Cairo } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { PwaInstallBanner } from "@/components/pwa/install-banner";
 import "./globals.css";
 
 export const revalidate = 300;
@@ -60,6 +61,7 @@ export default function RootLayout({
       <body className="min-h-screen">
         {children}
         <Toaster position="top-center" richColors />
+        <PwaInstallBanner />
       </body>
     </html>
   );

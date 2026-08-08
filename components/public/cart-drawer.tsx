@@ -18,8 +18,8 @@ type Props = {
   currency: string;
   tables: MenuTable[];
   items: CartItem[];
-  onUpdateQty: (itemId: string, qty: number) => void;
-  onRemove: (itemId: string) => void;
+  onUpdateQty: (itemId: string, sizeCode: string | null | undefined, qty: number) => void;
+  onRemove: (itemId: string, sizeCode: string | null | undefined) => void;
   onOrderPlaced: () => void;
 };
 
@@ -170,11 +170,18 @@ export function CartDrawer({
                     <ul className="space-y-3">
                       {items.map((i) => (
                         <li
-                          key={i.itemId}
+                          key={`${i.itemId}::${i.sizeCode ?? ""}`}
                           className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3"
                         >
                           <div className="flex flex-1 flex-col gap-1">
-                            <p className="text-sm font-bold text-cream">{i.name}</p>
+                            <p className="flex items-center gap-1.5 text-sm font-bold text-cream">
+                              {i.name}
+                              {i.sizeCode ? (
+                                <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-black text-gold">
+                                  {i.sizeCode}
+                                </span>
+                              ) : null}
+                            </p>
                             <p className="text-xs font-semibold text-gold">
                               {formatPrice(i.price, currency, locale)}
                             </p>
@@ -183,7 +190,7 @@ export function CartDrawer({
                             <div className="flex items-center gap-1 rounded-full border border-gold/25 bg-background p-0.5">
                               <button
                                 type="button"
-                                onClick={() => onUpdateQty(i.itemId, i.qty - 1)}
+                                onClick={() => onUpdateQty(i.itemId, i.sizeCode, i.qty - 1)}
                                 className="flex h-7 w-7 items-center justify-center rounded-full text-cream/80 transition-colors hover:bg-gold/15 hover:text-gold active:scale-90"
                                 aria-label="−"
                               >
@@ -194,7 +201,7 @@ export function CartDrawer({
                               </span>
                               <button
                                 type="button"
-                                onClick={() => onUpdateQty(i.itemId, i.qty + 1)}
+                                onClick={() => onUpdateQty(i.itemId, i.sizeCode, i.qty + 1)}
                                 className="flex h-7 w-7 items-center justify-center rounded-full text-cream/80 transition-colors hover:bg-gold/15 hover:text-gold active:scale-90"
                                 aria-label="+"
                               >
@@ -203,7 +210,7 @@ export function CartDrawer({
                             </div>
                             <button
                               type="button"
-                              onClick={() => onRemove(i.itemId)}
+                              onClick={() => onRemove(i.itemId, i.sizeCode)}
                               className="flex h-8 w-8 items-center justify-center rounded-full text-cream/50 transition-colors hover:bg-destructive/10 hover:text-destructive"
                               aria-label={t(locale, "حذف", "Remove")}
                             >

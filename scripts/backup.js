@@ -16,7 +16,10 @@ process.env.DATABASE_URL = env.DATABASE_URL;
 process.env.DIRECT_URL = env.DIRECT_URL;
 
 const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const { PrismaPg } = require("@prisma/adapter-pg");
+const pg = require("pg");
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = env.SUPABASE_SERVICE_ROLE_KEY;

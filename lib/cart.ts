@@ -3,10 +3,17 @@
 export type CartItem = {
   itemId: string;
   name: string;
+  /** السعر النهائي بالفعل (بعد الخصم و/أو سعر المقاس) — يُحسب لحظة الإضافة */
   price: number;
   imageUrl: string | null;
+  sizeCode?: string | null;
   qty: number;
 };
+
+/** مفتاح فريد لكل سطر في السلة: صنف + مقاس (نفس الصنف بمقاسين = سطران منفصلان) */
+export function cartKey(item: { itemId: string; sizeCode?: string | null }) {
+  return `${item.itemId}::${item.sizeCode ?? ""}`;
+}
 
 const keyFor = (slug: string) => `qr-cart-${slug}`;
 

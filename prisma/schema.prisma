@@ -1,7 +1,8 @@
-// Prisma Schema — QR Menu (Supabase PostgreSQL / Vercel)
+// Prisma Schema — QR Menu (Supabase PostgreSQL / Vercel + Cloudflare)
 
 generator client {
-  provider = "prisma-client-js"
+  provider       = "prisma-client-js"
+  driverAdapters = true // يعمل على runtime Workers (Cloudflare Pages) عبر adapter-pg
 }
 
 datasource db {
@@ -53,21 +54,36 @@ model Category {
 }
 
 model MenuItem {
-  id           String     @id @default(uuid())
-  restaurantId String
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  name         String
-  description  String?
-  price        Float
-  imageUrl     String?
-  isAvailable  Boolean    @default(true)
-  categoryId   String
-  category     Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  createdAt    DateTime   @default(now())
-  favorites    Favorite[]
+  id                 String            @id @default(uuid())
+  restaurantId       String
+  restaurant         Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name               String
+  description        String?
+  price              Float
+  discountPercentage Int? // 0-100 — null/0 = لا خصم
+  imageUrl           String?
+  isAvailable        Boolean           @default(true)
+  categoryId         String
+  category           Category          @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt          DateTime          @default(now())
+  sizes              MenuItemSize[]
+  favorites          Favorite[]
 
   @@index([restaurantId])
   @@index([categoryId])
+}
+
+/// مقاس محدد لصنف (S/M/L/XL) بسعر خاص به — يُستخدم عند الطلب
+model MenuItemSize {
+  id         String   @id @default(uuid())
+  sizeCode   String // S | M | L | XL
+  price      Float
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([menuItemId, sizeCode])
+  @@index([menuItemId])
 }
 
 /// تفضيلات الزبون — userId = Supabase Auth user id
@@ -142,13 +158,14 @@ model Table {
 }
 
 model OrderItem {
-  id      String @id @default(uuid())
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  itemId  String? // مرجع الصنف الأصلي (لتقارير الأكثر مبيعًا)
-  name    String
-  price   Float
-  qty     Int
+  id       String  @id @default(uuid())
+  orderId  String
+  order    Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId   String? // مرجع الصنف الأصلي (لتقارير الأكثر مبيعًا)
+  name     String
+  sizeCode String? // S/M/L/XL عند طلب صنف بمقاس — يظهر للموظف والأدمن
+  price    Float // السعر النهائي المحسوب (بعد الخصم إن وُجد)
+  qty      Int
 
   @@index([orderId])
   @@index([itemId])

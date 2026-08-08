@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { ChevronDown, Heart, Languages, LogOut, ScanLine, ShoppingBag, Sparkles, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
+import { applyDiscount } from "@/lib/utils";
 import type { MenuData } from "@/lib/data";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/client";
@@ -13,7 +14,7 @@ import { getFavoriteItemsAction, toggleFavoriteAction } from "@/lib/actions/favo
 import { ItemCard } from "@/components/public/item-card";
 import { FavoritesAuth } from "@/components/public/favorites-auth";
 import { CartDrawer } from "@/components/public/cart-drawer";
-import { loadCart, saveCart, cartCount, cartTotal, type CartItem } from "@/lib/cart";
+import { loadCart, saveCart, cartCount, cartTotal, cartKey, type CartItem } from "@/lib/cart";
 
 type Props = {
   dict: Dictionary;
@@ -27,6 +28,7 @@ type FavoriteItem = {
   id: string;
   name: string;
   price: number;
+  discountPercentage: number | null;
   imageUrl: string | null;
   categoryName: string;
 };
@@ -65,32 +67,55 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
   }, [slug, cart]);
 
   const addToCart = useCallback(
-    (item: { id: string; name: string; price: number; imageUrl: string | null }) => {
+    (
+      item: { id: string; name: string; price: number; imageUrl: string | null },
+      selected?: { sizeCode?: string; price: number },
+    ) => {
+      const sizeCode = selected?.sizeCode ?? undefined;
+      const unitPrice = selected?.price ?? item.price;
       setCart((prev) => {
-        const existing = prev.find((i) => i.itemId === item.id);
+        const key = cartKey({ itemId: item.id, sizeCode });
+        const existing = prev.find((i) => cartKey(i) === key);
         if (existing) {
           return prev.map((i) =>
-            i.itemId === item.id ? { ...i, qty: Math.min(i.qty + 1, 50) } : i,
+            cartKey(i) === key ? { ...i, qty: Math.min(i.qty + 1, 50) } : i,
           );
         }
         return [
           ...prev,
-          { itemId: item.id, name: item.name, price: item.price, imageUrl: item.imageUrl, qty: 1 },
+          {
+            itemId: item.id,
+            name: item.name,
+            price: unitPrice,
+            imageUrl: item.imageUrl,
+            sizeCode,
+            qty: 1,
+          },
         ];
       });
     },
     [],
   );
 
-  const updateQty = useCallback((itemId: string, qty: number) => {
-    setCart((prev) =>
-      qty <= 0 ? prev.filter((i) => i.itemId !== itemId) : prev.map((i) => (i.itemId === itemId ? { ...i, qty: Math.min(qty, 50) } : i)),
-    );
-  }, []);
+  const updateQty = useCallback(
+    (itemId: string, sizeCode: string | null | undefined, qty: number) => {
+      const key = cartKey({ itemId, sizeCode });
+      setCart((prev) =>
+        qty <= 0
+          ? prev.filter((i) => cartKey(i) !== key)
+          : prev.map((i) => (cartKey(i) === key ? { ...i, qty: Math.min(qty, 50) } : i)),
+      );
+    },
+    [],
+  );
 
-  const removeFromCart = useCallback((itemId: string) => {
-    setCart((prev) => prev.filter((i) => i.itemId !== itemId));
-  }, []);
+  const removeFromCart = useCallback(
+    (itemId: string, sizeCode: string | null | undefined) => {
+      const key = cartKey({ itemId, sizeCode });
+      setCart((prev) => prev.filter((i) => cartKey(i) !== key));
+    },
+    [],
+  );
 
   const handleOrderPlaced = useCallback(() => {
     setCart([]);
@@ -402,6 +427,8 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
                       name: f.name,
                       description: null,
                       price: f.price,
+                      discountPercentage: f.discountPercentage,
+                      sizes: [],
                       imageUrl: f.imageUrl,
                       isAvailable: true,
                     }}
@@ -413,13 +440,14 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
                     favorite={true}
                     onToggleFavorite={() => handleToggleFavorite(f.id)}
                     qtyInCart={cartQtyOf(f.id)}
-                    onAdd={() =>
-                      addToCart({
-                        id: f.id,
-                        name: f.name,
-                        price: f.price,
-                        imageUrl: f.imageUrl,
-                      })
+                    onAdd={(sel) =>
+                      addToCart(
+                        { id: f.id, name: f.name, price: f.price, imageUrl: f.imageUrl },
+                        {
+                          sizeCode: sel?.sizeCode,
+                          price: sel?.price ?? applyDiscount(f.price, f.discountPercentage),
+                        },
+                      )
                     }
                   />
                 ))}
@@ -465,13 +493,14 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
                       onToggleFavorite={() => handleToggleFavorite(item.id)}
                       qtyInCart={cartQtyOf(item.id)}
                       bestSeller={bestSellers.includes(item.id)}
-                      onAdd={() =>
-                        addToCart({
-                          id: item.id,
-                          name: item.name,
-                          price: item.price,
-                          imageUrl: item.imageUrl,
-                        })
+                      onAdd={(sel) =>
+                        addToCart(
+                          { id: item.id, name: item.name, price: item.price, imageUrl: item.imageUrl },
+                          {
+                            sizeCode: sel?.sizeCode,
+                            price: sel?.price ?? applyDiscount(item.price, item.discountPercentage),
+                          },
+                        )
                       }
                     />
                   ))}

@@ -240,7 +240,13 @@ export function AdminShell({ data }: { data: AdminData }) {
           {tab === "categories" && <CategoriesPanel data={data} onChanged={onChanged} />}
           {tab === "tables" && <TablesPanel />}
           {tab === "staff" && <StaffPanel staffPin={data.restaurant.staffPin} slug={data.restaurant.slug} onSaved={onChanged} />}
-          {tab === "settings" && <SettingsPanel settings={data.settings} onSaved={onChanged} />}
+          {tab === "settings" && (
+            <SettingsPanel
+              settings={data.settings}
+              onSaved={onChanged}
+              dashboardUrl={`${siteUrl}/admin`}
+            />
+          )}
           {tab === "qr" && <QrPanel restaurantName={data.settings.restaurantName} menuUrl={menuUrl} />}
         </div>
       </main>

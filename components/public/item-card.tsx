@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Flame, Heart, Plus, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
+import { applyDiscount } from "@/lib/utils";
 import type { MenuCategory } from "@/lib/data";
 
 type Props = {
@@ -17,7 +19,8 @@ type Props = {
   favorite?: boolean;
   onToggleFavorite?: () => void;
   qtyInCart?: number;
-  onAdd?: () => void;
+  /** يُستدعى مع السعر النهائي المحسوب (بعد الخصم و/أو المقاس) — السلة لا تحسب شيئًا */
+  onAdd?: (selection: { sizeCode?: string; price: number }) => void;
   bestSeller?: boolean;
 };
 
@@ -34,6 +37,20 @@ export function ItemCard({
   onAdd,
   bestSeller = false,
 }: Props) {
+  const sizes = item.sizes ?? [];
+  const hasDiscount = (item.discountPercentage ?? 0) > 0;
+
+  // المقاس المختار (إن وُجدت مقاسات) — يُصفَّر عند تغيّر العنصر
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  useEffect(() => {
+    setSelectedSize(null);
+  }, [item.id]);
+
+  const selected = sizes.find((s) => s.sizeCode === selectedSize) ?? null;
+  const basePrice = selected ? selected.price : item.price;
+  const finalPrice = applyDiscount(basePrice, item.discountPercentage);
+  const saveable = !sizes.length || selectedSize !== null;
+
   return (
     <motion.article
       initial={{ opacity: 0, y: 22 }}
@@ -85,12 +102,12 @@ export function ItemCard({
             <Heart className={cn("h-4 w-4", favorite && "fill-[#EF4444]")} />
           </button>
         ) : null}
-        {/* شارة السعر */}
+        {/* شارة السعر النهائي */}
         <span
           className="absolute bottom-3 rounded-full bg-gradient-to-l from-gold to-[#a87a2b] px-3.5 py-1 text-xs font-black text-background shadow-md"
           style={{ insetInlineStart: "0.75rem" }}
         >
-          {formatPrice(item.price, currency, locale)}
+          {formatPrice(finalPrice, currency, locale)}
         </span>
         {bestSeller ? (
           <span
@@ -99,6 +116,15 @@ export function ItemCard({
           >
             <Flame className="h-3 w-3" />
             {locale === "ar" ? "الأكثر مبيعًا" : "Best seller"}
+          </span>
+        ) : null}
+        {/* شارة الخصم */}
+        {hasDiscount ? (
+          <span
+            className="absolute bottom-3 flex items-center gap-1 rounded-full border border-[#FF6B6B]/60 bg-[#EF4444]/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur"
+            style={{ insetInlineEnd: "0.75rem" }}
+          >
+            🔥 {item.discountPercentage}% OFF
           </span>
         ) : null}
         {!item.isAvailable ? (
@@ -122,6 +148,55 @@ export function ItemCard({
           </p>
         ) : null}
 
+        {/* السعر: القديم مشطوبًا (عند الخصم) + النهائي */}
+        <div className="mt-2.5 flex items-center gap-2">
+          {hasDiscount && basePrice !== finalPrice ? (
+            <del className="text-xs font-semibold text-cream/45">
+              {formatPrice(basePrice, currency, locale)}
+            </del>
+          ) : null}
+          <span className="text-sm font-black text-[#3ECF7A]">
+            {formatPrice(finalPrice, currency, locale)}
+          </span>
+          {selected ? (
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-black text-gold">
+              {selected.sizeCode}
+            </span>
+          ) : null}
+        </div>
+
+        {/* اختيار المقاس */}
+        {sizes.length > 0 && item.isAvailable ? (
+          <div className="mt-3 flex items-center gap-1.5">
+            {sizes.map((s) => {
+              const isOn = selectedSize === s.sizeCode;
+              const sFinal = applyDiscount(s.price, item.discountPercentage);
+              return (
+                <button
+                  key={s.sizeCode}
+                  type="button"
+                  onClick={() => setSelectedSize(isOn ? null : s.sizeCode)}
+                  aria-pressed={isOn}
+                  title={`${s.sizeCode} — ${formatPrice(sFinal, currency, locale)}`}
+                  className={cn(
+                    "flex h-8 min-w-9 items-center justify-center rounded-lg border px-2 text-[11px] font-black transition-all active:scale-95",
+                    isOn
+                      ? "border-gold bg-gold/20 text-gold shadow-sm"
+                      : "border-border bg-background/60 text-cream/70 hover:border-gold/50 hover:text-gold",
+                  )}
+                >
+                  {s.sizeCode}
+                </button>
+              );
+            })}
+            {!selectedSize ? (
+              <span className="ms-1 text-[10px] text-cream/50">
+                {locale === "ar" ? "اختر المقاس" : "Pick a size"}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="mt-auto pt-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-cream/65">
@@ -140,10 +215,11 @@ export function ItemCard({
             {onAdd && item.isAvailable ? (
               <button
                 type="button"
-                onClick={onAdd}
+                disabled={!saveable}
+                onClick={() => onAdd({ sizeCode: selectedSize ?? undefined, price: finalPrice })}
                 aria-label={locale === "ar" ? "إضافة إلى السلة" : "Add to cart"}
                 className={cn(
-                  "flex h-9 items-center justify-center gap-1.5 rounded-full border font-black transition-all active:scale-90",
+                  "flex h-9 items-center justify-center gap-1.5 rounded-full border font-black transition-all active:scale-90 disabled:cursor-not-allowed disabled:opacity-40",
                   qtyInCart > 0
                     ? "border-gold/60 bg-gold/15 px-3.5 text-gold"
                     : "border-gold/30 bg-gold/10 px-3 text-cream hover:bg-gold/20 hover:text-gold",

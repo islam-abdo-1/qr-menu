@@ -345,7 +345,14 @@ export function StaffShell({ slug }: { slug?: string }) {
                     <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-gold/15 px-1 text-[11px] font-black text-gold">
                       {i.qty}
                     </span>
-                    <span className="text-cream/85">{i.name}</span>
+                    <span className="text-cream/85">
+                      {i.name}
+                      {i.sizeCode ? (
+                        <span className="ms-1.5 rounded-md border border-gold/40 bg-gold/10 px-1.5 py-0.5 text-[10px] font-black text-gold">
+                          {i.sizeCode}
+                        </span>
+                      ) : null}
+                    </span>
                   </li>
                 ))}
               </ul>

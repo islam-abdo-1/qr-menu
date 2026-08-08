@@ -13,12 +13,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ImageUploader } from "@/components/admin/image-uploader";
+import { PwaSettingsShare } from "@/components/pwa/settings-share";
 import { updateSettingsAction } from "@/lib/actions/settings";
 import type { AdminSettings } from "./types";
 
 type Props = {
   settings: AdminSettings;
   onSaved: () => void;
+  dashboardUrl?: string;
 };
 
 const CURRENCIES = [
@@ -28,7 +30,7 @@ const CURRENCIES = [
   { code: "AED", label: "درهم إماراتي (د.إ)" },
 ];
 
-export function SettingsPanel({ settings, onSaved }: Props) {
+export function SettingsPanel({ settings, onSaved, dashboardUrl }: Props) {
   const [name, setName] = useState(settings.restaurantName);
   const [currency, setCurrency] = useState(settings.currency || "EGP");
   const [logoUrl, setLogoUrl] = useState<string | null>(settings.logoUrl || null);
@@ -112,6 +114,10 @@ export function SettingsPanel({ settings, onSaved }: Props) {
             حفظ الإعدادات
           </Button>
         </form>
+      </div>
+
+      <div className="border-t border-border p-6 sm:p-8">
+        {dashboardUrl ? <PwaSettingsShare dashboardUrl={dashboardUrl} /> : null}
       </div>
     </div>
   );

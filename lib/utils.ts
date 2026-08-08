@@ -27,3 +27,14 @@ export function publicImageUrl(path: string) {
   if (/^https?:\/\//.test(path)) return path;
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/menu-images/${path}`;
 }
+
+/**
+ * تطبيق خصم نسبة على سعر — نقطة الحساب الوحيدة في النظام:
+ * finalPrice = base - (base * discountPercentage / 100)
+ * التقريب لأقرب قرش يمنع أخطاء الفاصلة العائمة.
+ */
+export function applyDiscount(price: number, discountPercentage: number | null | undefined) {
+  const pct = discountPercentage == null ? 0 : Math.max(0, Math.min(100, discountPercentage));
+  if (pct <= 0) return price;
+  return Math.round(price * (1 - pct / 100) * 100) / 100;
+}

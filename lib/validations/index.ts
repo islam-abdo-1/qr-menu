@@ -25,6 +25,27 @@ export const menuItemSchema = z.object({
   categoryId: z.string().min(1, "اختر قسمًا"),
   imageUrl: z.string().trim().max(500).optional().nullable(),
   isAvailable: z.boolean().optional(),
+  // خصم نسبة (0-100) — null/0 = بدون خصم
+  discountPercentage: z.coerce
+    .number()
+    .int()
+    .min(0, "النسبة يجب أن تكون بين 0 و 100")
+    .max(100, "النسبة يجب أن تكون بين 0 و 100")
+    .optional()
+    .nullable(),
+  // مقاسات مفعلة بسعرها الخاص — حتى 4 مقاسات (S/M/L/XL)
+  sizes: z
+    .array(
+      z.object({
+        sizeCode: z.enum(["S", "M", "L", "XL"]),
+        price: z.coerce
+          .number()
+          .positive("سعر المقاس يجب أن يكون أكبر من صفر")
+          .max(1_000_000, "سعر المقاس كبير جدًا"),
+      }),
+    )
+    .max(4, "4 مقاسات كحد أقصى")
+    .optional(),
 });
 
 export const settingsSchema = z.object({
@@ -71,6 +92,7 @@ export const orderSchema = z.object({
       z.object({
         itemId: z.string().min(1),
         qty: z.number().int().min(1).max(50),
+        sizeCode: z.string().trim().max(4).optional().nullable(),
       }),
     )
     .min(1, "السلة فارغة")

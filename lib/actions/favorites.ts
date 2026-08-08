@@ -72,6 +72,7 @@ export async function getFavoriteItemsAction(): Promise<
       id: string;
       name: string;
       price: number;
+      discountPercentage: number | null;
       imageUrl: string | null;
       categoryName: string;
     }[]
@@ -89,6 +90,7 @@ export async function getFavoriteItemsAction(): Promise<
             id: true,
             name: true,
             price: true,
+            discountPercentage: true,
             imageUrl: true,
             isAvailable: true,
             category: { select: { name: true } },
@@ -104,6 +106,7 @@ export async function getFavoriteItemsAction(): Promise<
           id: r.item.id,
           name: r.item.name,
           price: r.item.price,
+          discountPercentage: r.item.discountPercentage,
           imageUrl: r.item.imageUrl,
           categoryName: r.item.category.name,
         })),

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { orderSchema, staffLoginSchema } from "@/lib/validations";
 import { fromZod, fail, ok, type ActionResult } from "@/lib/actions/helpers";
 import { getOwnerRestaurant } from "@/lib/data";
+import { applyDiscount } from "@/lib/utils";
 import { getStaffSession, setStaffSession, clearStaffSession } from "@/lib/staff-session";
 
 export type OrderStatus = "new" | "preparing" | "done";
@@ -14,6 +15,9 @@ const ORDER_STATUSES: OrderStatus[] = ["new", "preparing", "done"];
 const ORDER_TAG = "orders";
 
 const STATUS_RANK: Record<OrderStatus, number> = { new: 0, preparing: 1, done: 2 };
+
+/** خطأ تحقق من بند طلب — يُعرض رسالته للزبون كفشل طلب طبيعي */
+class OrderLineError extends Error {}
 
 export type OrderView = {
   id: string;
@@ -29,7 +33,7 @@ export type OrderView = {
   total: number;
   createdAt: Date;
   completedAt: Date | null;
-  items: { id: string; name: string; price: number; qty: number }[];
+  items: { id: string; name: string; price: number; qty: number; sizeCode: string | null }[];
 };
 
 async function loadOrders(restaurantId: string): Promise<OrderView[]> {
@@ -40,11 +44,15 @@ async function loadOrders(restaurantId: string): Promise<OrderView[]> {
   const [active, done] = await Promise.all([
     prisma.order.findMany({
       where: { restaurantId, status: { in: ["new", "preparing"] } },
-      include: { items: { select: { id: true, name: true, price: true, qty: true } } },
+      include: {
+        items: { select: { id: true, name: true, price: true, qty: true, sizeCode: true } },
+      },
     }),
     prisma.order.findMany({
       where: { restaurantId, status: "done", createdAt: { gte: since } },
-      include: { items: { select: { id: true, name: true, price: true, qty: true } } },
+      include: {
+        items: { select: { id: true, name: true, price: true, qty: true, sizeCode: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: 150,
     }),
@@ -85,7 +93,7 @@ export type CreateOrderInput = {
   phone?: string;
   address?: string;
   notes?: string;
-  items: { itemId: string; qty: number }[];
+  items: { itemId: string; qty: number; sizeCode?: string | null }[];
 };
 
 export async function createOrderAction(
@@ -112,6 +120,13 @@ export async function createOrderAction(
       prisma.restaurant.findUnique({ where: { slug: parsed.data.restaurantSlug } }),
       prisma.menuItem.findMany({
         where: { id: { in: itemIds }, restaurant: { slug: parsed.data.restaurantSlug }, isAvailable: true },
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          discountPercentage: true,
+          sizes: { select: { sizeCode: true, price: true } },
+        },
       }),
       prisma.table.findMany({
         where: { restaurant: { slug: parsed.data.restaurantSlug } },
@@ -132,12 +147,27 @@ export async function createOrderAction(
     }
 
     if (dbItems.length !== itemIds.length) return fail("بعض العناصر غير متاحة حاليًا");
-    const priceMap = new Map(dbItems.map((i) => [i.id, i.price]));
-
-    const total = parsed.data.items.reduce(
-      (sum, i) => sum + (priceMap.get(i.itemId) ?? 0) * i.qty,
-      0,
+    const itemMap = new Map(dbItems.map((i) => [i.id, i]));
+    const sizeMap = new Map(
+      dbItems.flatMap((i) => i.sizes.map((s) => [`${i.id}::${s.sizeCode}`, s.price])),
     );
+
+    // حساب السعر نهائيًا من القاعدة فقط: مقاس إن وُجد ثم الخصم إن وُجد
+    // العميل لا يرسل أسعارًا أبدًا — أي تلاعب لا يتجاوز هذا الحساب.
+    const lines = parsed.data.items.map((i) => {
+      const item = itemMap.get(i.itemId)!;
+      const sizeCode = i.sizeCode || null;
+      const unitPrice = sizeCode
+        ? (sizeMap.get(`${i.itemId}::${sizeCode}`) ?? NaN)
+        : item.price;
+      if (!Number.isFinite(unitPrice)) {
+        throw new OrderLineError("مقاس غير صالح لعنصر في سلة المشتريات");
+      }
+      const finalPrice = applyDiscount(unitPrice, item.discountPercentage);
+      return { item, sizeCode, unitPrice, finalPrice, qty: i.qty };
+    });
+
+    const total = lines.reduce((sum, l) => sum + l.finalPrice * l.qty, 0);
     if (total <= 0) return fail("السلة فارغة");
 
     const number = numberRow[0].nextval;
@@ -156,11 +186,12 @@ export async function createOrderAction(
           notes: parsed.data.notes?.trim() || null,
           total,
           items: {
-            create: parsed.data.items.map((i) => ({
-              itemId: i.itemId,
-              name: dbItems.find((d) => d.id === i.itemId)!.name,
-              price: priceMap.get(i.itemId)!,
-              qty: i.qty,
+            create: lines.map((l) => ({
+              itemId: l.item.id,
+              name: l.item.name,
+              sizeCode: l.sizeCode,
+              price: l.finalPrice,
+              qty: l.qty,
             })),
           },
         },
@@ -197,6 +228,7 @@ export async function createOrderAction(
 
     return ok({ number, total });
   } catch (e) {
+    if (e instanceof OrderLineError) return fail(e.message);
     console.error("[orders] create failed:", e);
     return fail("حدث خطأ أثناء إرسال الطلب — حاول مجددًا");
   }
