@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Flame, Plus, UtensilsCrossed } from "lucide-react";
+import { Flame, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
 import { applyDiscount } from "@/lib/utils";
@@ -74,9 +74,14 @@ export function ItemCard({
               background: `radial-gradient(120% 120% at 50% 0%, ${themePrimary || "#C84C21"}55, transparent 60%), linear-gradient(160deg, #2A211A, #17120E)`,
             }}
           >
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-gold/30 bg-gold/15 backdrop-blur-sm">
-              <UtensilsCrossed className="h-7 w-7 text-gold" />
-            </div>
+            {/* اللوجو الذهبي الافتراضي — يظهر لأي صنف بلا صورة مرفوعة */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo-gold.png"
+              alt=""
+              aria-hidden
+              className="h-16 w-16 rounded-full border-2 border-gold/50 bg-[#14100D] object-cover opacity-90"
+            />
           </div>
         )}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" aria-hidden />
