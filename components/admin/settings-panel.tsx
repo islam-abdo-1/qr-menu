@@ -50,7 +50,7 @@ const CURRENCIES = [
 export function SettingsPanel({ settings, onSaved, dashboardUrl }: Props) {
   const [name, setName] = useState(settings.restaurantName);
   const [currency, setCurrency] = useState(settings.currency || "EGP");
-  const [logoUrl, setLogoUrl] = useState<string | null>(settings.logoUrl || "/logo-gold.png");
+  const [logoUrl, setLogoUrl] = useState<string | null>(settings.logoUrl || null);
   const [saving, setSaving] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -119,7 +119,7 @@ export function SettingsPanel({ settings, onSaved, dashboardUrl }: Props) {
               <div>
                 <Label>شعار المطعم</Label>
                 <p className="text-xs text-muted-foreground">
-                  يظهر بإطار ذهبي أعلى المنيو العام وفي لوحة الإدارة — صورة مربعة أو دائرية مثالية
+                  يظهر بإطار ذهبي أعلى المنيو العام وفي لوحة الإدارة وفي الأصناف التي بلا صور — صورة مربعة أو دائرية مثالية
                 </p>
               </div>
             </div>

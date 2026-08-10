@@ -131,7 +131,7 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
   const [active, setActive] = useState<string | null>(categories[0]?.id ?? null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const categoryKey = categories.map((c) => c.id).join("|");
-  const logoUrl = data.settings?.logoUrl ?? "/logo-gold.png";
+  const logoUrl = data.settings?.logoUrl ?? null;
 
   useEffect(() => {
     if (categories.length === 0) return;
@@ -338,6 +338,7 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
                       index={itemIndex}
                       delay={index * 0.02}
                       themePrimary={themePrimary}
+                      logoUrl={logoUrl}
                       qtyInCart={cartQtyOf(item.id)}
                       bestSeller={bestSellers.includes(item.id)}
                       onAdd={(sel) =>
@@ -411,10 +412,16 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
             aria-hidden
           />
           <div className="container flex flex-col items-center gap-4">
-            <div className="relative h-16 w-16 overflow-hidden rounded-full border-2 border-gold/70 bg-[#0D0A08] shadow-[0_0_30px_-6px_rgba(212,168,83,0.5)]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logoUrl} alt={restaurantName} className="h-full w-full object-cover" />
-            </div>
+            {logoUrl ? (
+              <div className="relative h-16 w-16 overflow-hidden rounded-full border-2 border-gold/70 bg-[#0D0A08] shadow-[0_0_30px_-6px_rgba(212,168,83,0.5)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={logoUrl} alt={restaurantName} className="h-full w-full object-cover" />
+              </div>
+            ) : (
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-gold/30 bg-gold/10 text-gold">
+                <UtensilsCrossed className="h-6 w-6" />
+              </span>
+            )}
             <p className="font-display text-3xl font-bold text-gold-gradient">
               {restaurantName}
             </p>

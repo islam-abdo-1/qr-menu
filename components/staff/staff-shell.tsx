@@ -60,7 +60,7 @@ export function StaffShell({ slug }: { slug?: string }) {
     if (!res.ok) return false;
     setRestaurantName(res.data.restaurantName);
     setStaffName(res.data.staffName);
-    setLogoUrl(res.data.brand.logoUrl || "/logo-gold.png");
+    setLogoUrl(res.data.brand.logoUrl || null);
     setCurrency(res.data.brand.currency || "EGP");
     setOrders(res.data.orders);
 
