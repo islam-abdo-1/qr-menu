@@ -16,8 +16,9 @@ export async function GET() {
 
   try {
     // الأحدث أولًا حتى يبقى أحدث اسم لكل رقم عند إزالة التكرار
+    // طلبات التوصيل فقط (لديها رقم هاتف) — طلبات الطاولة لا تصلح لتسويق WhatsApp
     const rows = await prisma.order.findMany({
-      where: { restaurantId: restaurant.id },
+      where: { restaurantId: restaurant.id, type: "delivery" },
       select: { customerName: true, phone: true },
       orderBy: { createdAt: "desc" },
     });
@@ -26,7 +27,7 @@ export async function GET() {
     const unique = new Map<string, string>();
     for (const r of rows) {
       const phone = r.phone?.trim();
-      if (!phone) continue; // طلبات الطاولة بلا هاتف لا تصلح لتسويق WhatsApp
+      if (!phone) continue;
       if (!unique.has(phone)) unique.set(phone, r.customerName);
     }
 

@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 /**
  * المسارات المحجوزة للنظام — تُستثنى من إعادة كتابة المستأجرين دائمًا.
- * (لوحة الإدارة، الدخول، Staff، صفحات /m و /en، واجهات API، وملفات عامة).
+ * (لوحة الإدارة، الدخول، Staff، صفحات /m، واجهات API، وملفات عامة).
  */
 const RESERVED = new Set([
   "admin",
@@ -11,7 +11,6 @@ const RESERVED = new Set([
   "signup",
   "staff",
   "m",
-  "en",
   "api",
   "_next",
   "favicon.ico",
@@ -26,22 +25,20 @@ const FILE_EXT = /\.(?:a?png|jpe?g|svg|webp|gif|ico|txt|xml|map|json|woff2?|wasm
 /**
  * توجيه متعدد المستأجرين (Multi-tenant):
  *  - `domain.com/kafy`    → يُعاد كتابته داخليًا إلى `/m/kafy`
- *  - `domain.com/kafy/en` → `/m/kafy/en`
  *
  * قرارات العلية المعمارية:
  *  - نقوم بـ REWRITE وليس REDIRECT — يبقى الرابط في المتصفح نظيفًا
  *    (`/kafy`) أفضل للطباعة على QR وشارة المطعم، بينما يعالج الصفحة نفسها.
  *  - لا استعلام DB هنا إطلاقًا (الـ Middleware بيئة Edge بلا pg)؛
  *    الصفحة `/m/[slug]` نفسها تتحقق من وجود المطعم وتعرض 404 عند الغياب.
- *  - أي مقطع مسار غير محجوز يُعامل كمستأجر — خرائط QR قديمة بـ /m/... تبقى تعمل.
+ *  - أي مقطع مسار غير محجوز يُعامل كمستأجر — خرائط QR القديمة بـ /m/... تبقى تعمل.
  */
 function tenantRewrite(pathname: string): string | null {
-  if (pathname === "/" || pathname === "/en") return null;
+  if (pathname === "/") return null;
   const parts = pathname.split("/").filter(Boolean);
   const slug = parts[0];
   if (!slug || RESERVED.has(slug) || FILE_EXT.test(slug)) return null;
   if (parts.length === 1) return `/m/${slug}`;
-  if (parts.length === 2 && parts[1] === "en") return `/m/${slug}/en`;
   return null;
 }
 
@@ -83,7 +80,6 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAdminPath = pathname.startsWith("/admin");
   const isLoginPath = pathname === "/login" || pathname.startsWith("/login");
-  const locale = pathname.startsWith("/en") ? "en" : "ar";
 
   // لا نتحقق من الجلسة في الصفحات العامة إطلاقًا (سرعة + ثبات ISR)
   let user: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"] | null = null;
@@ -98,7 +94,6 @@ export async function updateSession(request: NextRequest) {
    * (للجلسة المنعشة من getUser()) فلا تفقد الجلسة أبدًا.
    */
   const inheritCookies = (res: NextResponse) => {
-    res.headers.set("x-locale", locale);
     supabaseResponse.cookies
       .getAll()
       .forEach((c) => res.cookies.set(c.name, c.value, c));

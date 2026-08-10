@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Download, Loader2, Phone, MapPin, MessageSquare, Clock3, Store, Bike } from "lucide-react";
+import { CheckCircle2, Download, Eye, Loader2, Phone, MapPin, MessageSquare, Clock3, Store, Bike } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
 import { updateOrderStatusAction, type OrderStatus, type OrderView } from "@/lib/actions/orders";
+import { OrderDetailsDialog } from "@/components/orders/order-details-dialog";
 
 const STATUS_META: Record<OrderStatus, { label: string; next: OrderStatus | null; cls: string }> = {
   new: { label: "جديد", next: "preparing", cls: "bg-gold/15 text-gold border-gold/30" },
@@ -16,11 +17,14 @@ const STATUS_META: Record<OrderStatus, { label: string; next: OrderStatus | null
 export function OrdersPanel({
   orders,
   onStatusChanged,
+  currency,
 }: {
   orders: OrderView[] | null;
   onStatusChanged: () => void;
+  currency: string;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [selected, setSelected] = useState<OrderView | null>(null);
 
   async function advance(orderId: string, status: OrderStatus) {
     setBusy(orderId);
@@ -42,9 +46,10 @@ export function OrdersPanel({
             <Download className="h-5 w-5" />
           </span>
           <div>
-            <p className="text-sm font-black">بيانات العملاء</p>
+            <p className="text-sm font-black">بيانات عملاء التوصيل</p>
             <p className="text-xs text-muted-foreground">
-              نزّل أسماء وأرقام عملاء مطعمك (CSV) — جاهز لحملات WhatsApp
+              نزّل أسماء وأرقام عملاء طلبات التوصيل فقط (CSV) — طلبات الطاولة غير مضمّنة —
+              جاهز لحملات WhatsApp
             </p>
           </div>
         </div>
@@ -160,7 +165,7 @@ export function OrdersPanel({
                 ) : null}
               </div>
               <p className="text-lg font-black text-gold">
-                {formatPrice(o.total, "EGP", "ar")}
+                {formatPrice(o.total, currency, "ar")}
               </p>
             </div>
 
@@ -179,30 +184,41 @@ export function OrdersPanel({
                     ) : null}
                   </span>
                   <span className="ms-auto text-xs text-cream/50">
-                    {formatPrice(i.price * i.qty, "EGP", "ar")}
+                    {formatPrice(i.price * i.qty, currency, "ar")}
                   </span>
                 </li>
               ))}
             </ul>
 
-            {meta.next ? (
+            <div className="mt-4 flex gap-2">
               <button
                 type="button"
-                disabled={busy === o.id}
-                onClick={() => advance(o.id, meta.next!)}
-                className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-gold/40 bg-gold/10 text-sm font-black text-gold transition-all hover:bg-gold/20 active:scale-[0.99] disabled:opacity-60"
+                onClick={() => setSelected(o)}
+                className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-gold/40 bg-gold/10 text-sm font-black text-gold transition-all hover:bg-gold/20 active:scale-[0.99]"
               >
-                {busy === o.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : null}
-                {o.status === "new" ? "بدء التحضير" : "تم التسليم"}
+                <Eye className="h-4 w-4" />
+                تفاصيل الطلب
               </button>
-            ) : null}
+              {meta.next ? (
+                <button
+                  type="button"
+                  disabled={busy === o.id}
+                  onClick={() => advance(o.id, meta.next!)}
+                  className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-gold/40 bg-gold/10 text-sm font-black text-gold transition-all hover:bg-gold/20 active:scale-[0.99] disabled:opacity-60"
+                >
+                  {busy === o.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : null}
+                  {o.status === "new" ? "بدء التحضير" : "تم التسليم"}
+                </button>
+              ) : null}
+            </div>
           </div>
         );
       })}
       </div>
       )}
+      <OrderDetailsDialog order={selected} currency={currency} onClose={() => setSelected(null)} />
     </>
   );
 }

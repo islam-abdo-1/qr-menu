@@ -6,6 +6,7 @@ import { orderSchema, staffLoginSchema } from "@/lib/validations";
 import { fromZod, fail, ok, type ActionResult } from "@/lib/actions/helpers";
 import { getOwnerRestaurant } from "@/lib/data";
 import { applyDiscount } from "@/lib/utils";
+import { isValidPhone } from "@/lib/utils";
 import { getStaffSession, setStaffSession, clearStaffSession } from "@/lib/staff-session";
 
 export type OrderStatus = "new" | "preparing" | "done";
@@ -33,33 +34,60 @@ export type OrderView = {
   total: number;
   createdAt: Date;
   completedAt: Date | null;
-  items: { id: string; name: string; price: number; qty: number; sizeCode: string | null }[];
+  items: {
+    id: string;
+    name: string;
+    price: number;
+    qty: number;
+    sizeCode: string | null;
+    imageUrl: string | null;
+  }[];
 };
 
 async function loadOrders(restaurantId: string): Promise<OrderView[]> {
   // استعلامان متوازيان خفيفان:
   //  - النشط (جديد/في التحضير): يُجلب كاملًا دائمًا — لا يختفي طلب شغال أبدًا
-  //  - المكتمل: آخر 24 ساعة بحد أقصى 150 — يمنع تضخم الاستجابة مع نمو القاعدة
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  //  - المكتمل: آخر 30 يومًا (مطابق للتنظيف التلقائي) بحد 500 —
+  //    يكفي للتاريخ الكامل دون تضخم الاستجابة. الأقدم يُمسح تلقائيًا من القاعدة.
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const [active, done] = await Promise.all([
     prisma.order.findMany({
       where: { restaurantId, status: { in: ["new", "preparing"] } },
       include: {
-        items: { select: { id: true, name: true, price: true, qty: true, sizeCode: true } },
+        items: { select: { id: true, name: true, price: true, qty: true, sizeCode: true, itemId: true } },
       },
     }),
     prisma.order.findMany({
       where: { restaurantId, status: "done", createdAt: { gte: since } },
       include: {
-        items: { select: { id: true, name: true, price: true, qty: true, sizeCode: true } },
+        items: { select: { id: true, name: true, price: true, qty: true, sizeCode: true, itemId: true } },
       },
       orderBy: { createdAt: "desc" },
-      take: 150,
+      take: 500,
     }),
   ]);
 
+  const orders = [...active, ...done];
+
+  // صور الأصناف من جدول المنيو الأصلي (بلا علاقة Prisma) — تُعرض في تفاصيل الطلب
+  const itemIds = Array.from(
+    new Set(
+      orders
+        .flatMap((o) => o.items.map((i) => i.itemId))
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  const imageMap = new Map<string, string | null>();
+  if (itemIds.length > 0) {
+    const imgs = await prisma.menuItem.findMany({
+      where: { restaurantId, id: { in: itemIds } },
+      select: { id: true, imageUrl: true },
+    });
+    imgs.forEach((m) => imageMap.set(m.id, m.imageUrl));
+  }
+
   // ترتيب ثابت: الجديد أولًا ثم في التحضير ثم تم التسليم، والأحدث أولًا داخل كل حالة
-  return [...active, ...done]
+  return orders
     .map((o) => ({
       id: o.id,
       number: o.number,
@@ -74,7 +102,14 @@ async function loadOrders(restaurantId: string): Promise<OrderView[]> {
       total: o.total,
       createdAt: o.createdAt,
       completedAt: o.completedAt,
-      items: o.items,
+      items: o.items.map((i) => ({
+        id: i.id,
+        name: i.name,
+        price: i.price,
+        qty: i.qty,
+        sizeCode: i.sizeCode,
+        imageUrl: i.itemId ? (imageMap.get(i.itemId) ?? null) : null,
+      })),
     }))
     .sort(
       (a, b) =>
@@ -109,8 +144,13 @@ export async function createOrderAction(
   if (parsed.data.type === "dine-in" && !parsed.data.tableNo?.trim()) {
     return fail("اختر رقم الطاولة");
   }
-  if (parsed.data.type === "delivery" && !parsed.data.phone?.trim()) {
-    return fail("اكتب رقم الهاتف للتوصيل");
+  if (parsed.data.type === "delivery") {
+    if (!parsed.data.phone?.trim()) {
+      return fail("اكتب رقم الهاتف للتوصيل");
+    }
+    if (!isValidPhone(parsed.data.phone)) {
+      return fail("رقم الهاتف غير صحيح — اكتب رقم الجوال 11 رقمًا (مثال: 01012345678)");
+    }
   }
 
   try {
@@ -281,7 +321,9 @@ export async function staffLoginAction(
   name: string,
   pin: string,
   slug?: string,
-): Promise<ActionResult<{ restaurantName: string; slug: string; name: string }>> {
+): Promise<
+  ActionResult<{ restaurantName: string; slug: string; name: string }>
+> {
   const parsed = staffLoginSchema.safeParse({ name, pin });
   if (!parsed.success) {
     const { error } = fromZod(parsed.error);
@@ -293,14 +335,17 @@ export async function staffLoginAction(
       : await prisma.restaurant.findFirst({ where: { staffPin: parsed.data.pin } });
     if (!restaurant || !restaurant.staffPin) return fail("المطعم غير موجود أو الكود غير مفعّل");
 
-    // الاسم يجب أن يكون مسجّلًا ضمن موظفي هذا المطعم
-    const staff = await prisma.staff.findFirst({
-      where: {
-        restaurantId: restaurant.id,
-        name: { equals: parsed.data.name, mode: "insensitive" },
-      },
-      select: { id: true },
-    });
+    // الاسم يجب أن يكون مسجّلًا ضمن موظفي هذا المطعم + إعدادات العرض الحية (الاسم مُحرَّر من اللوحة)
+    const [staff, setting] = await Promise.all([
+      prisma.staff.findFirst({
+        where: {
+          restaurantId: restaurant.id,
+          name: { equals: parsed.data.name, mode: "insensitive" },
+        },
+        select: { id: true },
+      }),
+      prisma.setting.findUnique({ where: { restaurantId: restaurant.id } }),
+    ]);
     if (!staff) return fail("هذا الاسم غير مسجّل في قائمة الموظفين");
 
     // قفل بعد 5 محاولات خاطئة — يمنع تخمين الكود السري
@@ -334,7 +379,7 @@ export async function staffLoginAction(
     }
     await setStaffSession({ slug: restaurant.slug, name: parsed.data.name });
     return ok({
-      restaurantName: restaurant.name,
+      restaurantName: setting?.restaurantName || restaurant.name,
       slug: restaurant.slug,
       name: parsed.data.name,
     });
@@ -350,17 +395,30 @@ export async function staffLogoutAction(): Promise<ActionResult<null>> {
 }
 
 export async function getStaffOrdersAction(): Promise<
-  ActionResult<{ restaurantName: string; staffName: string; orders: OrderView[] }>
+  ActionResult<{
+    restaurantName: string;
+    staffName: string;
+    orders: OrderView[];
+    brand: { logoUrl: string | null; currency: string };
+  }>
 > {
   try {
     const session = await getStaffSession();
     if (!session) return fail("غير مصرح — أعد الدخول بالاسم والكود السري");
     const restaurant = await prisma.restaurant.findUnique({ where: { slug: session.slug } });
     if (!restaurant) return fail("المطعم غير موجود");
+    // الإعدادات الحية: الاسم والشعار والعملة كما في لوحة الإدارة — لا نسخة التسجيل الميتة
+    const setting = await prisma.setting.findUnique({
+      where: { restaurantId: restaurant.id },
+    });
     return ok({
-      restaurantName: restaurant.name,
+      restaurantName: setting?.restaurantName || restaurant.name,
       staffName: session.name,
       orders: await loadOrders(restaurant.id),
+      brand: {
+        logoUrl: setting?.logoUrl || null,
+        currency: setting?.currency || "EGP",
+      },
     });
   } catch (e) {
     console.error("[staff] orders failed:", e);

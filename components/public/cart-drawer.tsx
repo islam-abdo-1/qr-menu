@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, Loader2, Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
+import { isValidPhone } from "@/lib/utils";
 import type { CartItem } from "@/lib/cart";
 import { cartCount, cartTotal } from "@/lib/cart";
 import { createOrderAction } from "@/lib/actions/orders";
@@ -84,6 +85,16 @@ export function CartDrawer({
   async function submitOrder(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    if (type === "delivery" && !isValidPhone(phone.trim())) {
+      setError(
+        t(
+          locale,
+          "رقم الهاتف غير صحيح — اكتب رقم الجوال 11 رقمًا (مثال: 01012345678)",
+          "Invalid phone number — enter an 11-digit mobile (e.g. 01012345678)",
+        ),
+      );
+      return;
+    }
     setLoading(true);
     const res = await createOrderAction({
       restaurantSlug: slug,
@@ -326,7 +337,13 @@ export function CartDrawer({
                         placeholder={t(locale, "رقم الهاتف", "Phone number")}
                         required
                         inputMode="tel"
-                        className="h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm outline-none transition-all focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
+                        dir="ltr"
+                        className={cn(
+                          "h-11 w-full rounded-xl border bg-background px-3.5 text-sm outline-none transition-all focus:ring-4",
+                          phone.trim() && !isValidPhone(phone.trim())
+                            ? "border-destructive/60 focus:border-destructive/60 focus:ring-destructive/10"
+                            : "border-input focus:border-primary/50 focus:ring-primary/10",
+                        )}
                       />
                       <input
                         value={address}

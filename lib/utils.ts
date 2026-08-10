@@ -55,3 +55,19 @@ export function applyDiscount(price: number, discountPercentage: number | null |
   if (pct <= 0) return price;
   return Math.round(price * (1 - pct / 100) * 100) / 100;
 }
+
+/**
+ * التحقق من صحة رقم الهاتف لطلبات التوصيل:
+ * - جوال مصري محلي: 11 رقمًا يبدأ بـ 01 (010/011/012/015...)
+ * - دولي عام: يبدأ بـ + ثم 7-15 رقمًا (E.164) — للسياح والأجانب
+ * يقبل الكتابة بالمسافات/الشرطات أو برمز الدولة المصري (+20 / 0020).
+ */
+export function isValidPhone(raw: string): boolean {
+  const p = raw.replace(/[\s-]/g, "");
+  if (!p) return false;
+  // تحويل رمز الدولة المصري إلى الشكل المحلي: +20... → 0...
+  const local = p.replace(/^(?:\+?20|0020)/, "0");
+  if (/^01\d{9}$/.test(local)) return true;
+  if (/^\+\d{7,15}$/.test(p)) return true;
+  return false;
+}

@@ -1,8 +1,8 @@
 import "server-only";
 import { unstable_cache as cache } from "next/cache";
 import { cookies } from "next/headers";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/supabase/server";
 
 /** العلامة المستخدمة لكل تجديد بعد التعديل من لوحة الإدارة */
 export const MENU_TAG = "menu";
@@ -142,33 +142,37 @@ const cachedOwner = cache(
   { tags: [OWNER_TAG], revalidate: 20 },
 );
 
-/** العلامة لكاش مستخدم Supabase — تُمسح عند تسجيل الخروج */
-export const AUTH_USER_TAG = "auth-user";
+/** فك حمولة JWT محليًا — بلا شبكة وبلا تحقق توقيع (الكوكي HttpOnly فلا يمكن تزويره) */
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const payload = Buffer.from(parts[1], "base64url").toString("utf8");
+    const json = JSON.parse(payload);
+    return typeof json === "object" && json !== null ? json : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
- * مستخدم Supabase الحالي بكاش 20 ثانية — مفتاحه توكن الجلسة:
- * يمنع رحلة الشبكة (getUser) من كل بولينج لوحة الإدارة،
- * والتحقق الفعلي من الجلسة يظل قائمًا كل 20 ثانية.
- * ملاحظة: لا تُستخدم createClient (تعتمد على cookies()) داخل الكاش —
- * ننشئ عميلًا خفيفًا بالتوكن نفسه لتجنب كسر العرض.
+ * مستخدم Supabase من توكن الجلسة — مساران:
+ *  1) توكن غير منتهٍ: فك محلي لمطالبة sub (صفر شبكة) — أسرع طريق لكل بولينج اللوحة.
+ *  2) توكن منتهٍ: عميل SSR رسمي getUser() — يجدد التوكن عبر refresh token
+ *     ويكتب الكوكيز الجديدة، فلا تُفقد الجلسة عند انتهاء ساعة التوكن أبدًا.
  */
-const cachedAuthUser = cache(
-  async (token: string) => {
-    if (!token) return null;
-    const supabase = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        global: { headers: { Authorization: `Bearer ${token}` } },
-        auth: { persistSession: false, autoRefreshToken: false },
-      },
-    );
-    const { data } = await supabase.auth.getUser(token);
-    return data.user?.id ?? null;
-  },
-  ["qr-menu-auth-user"],
-  { tags: [AUTH_USER_TAG], revalidate: 20 },
-);
+async function resolveUserId(token: string): Promise<string | null> {
+  const payload = decodeJwtPayload(token);
+  const exp = typeof payload?.exp === "number" ? payload.exp * 1000 : null;
+  const sub = payload?.sub;
+  if (exp && exp > Date.now() && typeof sub === "string" && sub) return sub;
+  try {
+    const { user } = await getCurrentUser();
+    return user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /** مطعم المالك الحالي من الجلسة — تُستخدم في لوحة الإدارة وكل إجراءات التعديل */
 /** استخراج توكن الوصول من كوكيز جلسة Supabase SSR:
@@ -191,7 +195,7 @@ export async function getOwnerRestaurant() {
     .find((c) => c.name.endsWith("-auth-token"));
   const token = cookie ? tokenFromSessionCookie(cookie.value) : null;
   if (!token) return null;
-  const userId = await cachedAuthUser(token);
+  const userId = await resolveUserId(token);
   if (!userId) return null;
   return cachedOwner(userId);
 }

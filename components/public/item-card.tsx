@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Flame, Heart, Plus, UtensilsCrossed } from "lucide-react";
+import { Flame, Plus, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
 import { applyDiscount } from "@/lib/utils";
@@ -16,8 +16,6 @@ type Props = {
   index?: number;
   delay?: number;
   themePrimary?: string;
-  favorite?: boolean;
-  onToggleFavorite?: () => void;
   qtyInCart?: number;
   /** يُستدعى مع السعر النهائي المحسوب (بعد الخصم و/أو المقاس) — السلة لا تحسب شيئًا */
   onAdd?: (selection: { sizeCode?: string; price: number }) => void;
@@ -31,8 +29,6 @@ export function ItemCard({
   index = 0,
   delay = 0,
   themePrimary,
-  favorite = false,
-  onToggleFavorite,
   qtyInCart = 0,
   onAdd,
   bestSeller = false,
@@ -84,24 +80,6 @@ export function ItemCard({
           </div>
         )}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" aria-hidden />
-        {/* زر التفضيل */}
-        {onToggleFavorite ? (
-          <button
-            type="button"
-            onClick={onToggleFavorite}
-            aria-label={locale === "ar" ? "حفظ في المفضلة" : "Save to favorites"}
-            aria-pressed={favorite}
-            className={cn(
-              "absolute top-3 flex h-9 w-9 items-center justify-center rounded-full border backdrop-blur transition-all active:scale-90",
-              favorite
-                ? "border-[#EF4444]/70 bg-[#EF4444]/25 text-[#EF4444] shadow-[0_0_16px_-4px_rgba(239,68,68,0.7)]"
-                : "border-border bg-black/50 text-cream/70 hover:border-[#EF4444]/50 hover:text-[#EF4444]",
-            )}
-            style={{ insetInlineEnd: "0.75rem" }}
-          >
-            <Heart className={cn("h-4 w-4", favorite && "fill-[#EF4444]")} />
-          </button>
-        ) : null}
         {/* شارة السعر النهائي */}
         <span
           className="absolute bottom-3 rounded-full bg-gradient-to-l from-gold to-[#a87a2b] px-3.5 py-1 text-xs font-black text-background shadow-md"

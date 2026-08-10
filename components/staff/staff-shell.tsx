@@ -7,6 +7,7 @@ import {
   Bike,
   CheckCircle2,
   Clock3,
+  Eye,
   Loader2,
   Lock,
   LogOut,
@@ -27,6 +28,7 @@ import {
   type OrderStatus,
   type OrderView,
 } from "@/lib/actions/orders";
+import { OrderDetailsDialog } from "@/components/orders/order-details-dialog";
 
 const STATUS_META: Record<OrderStatus, { label: string; next: OrderStatus | null; cls: string }> = {
   new: { label: "جديد", next: "preparing", cls: "bg-gold/15 text-gold border-gold/30" },
@@ -38,8 +40,11 @@ export function StaffShell({ slug }: { slug?: string }) {
   const router = useRouter();
   const [restaurantName, setRestaurantName] = useState<string | null>(null);
   const [staffName, setStaffName] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [currency, setCurrency] = useState<string>("EGP");
   const [orders, setOrders] = useState<OrderView[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [selected, setSelected] = useState<OrderView | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [name, setName] = useState("");
@@ -55,6 +60,8 @@ export function StaffShell({ slug }: { slug?: string }) {
     if (!res.ok) return false;
     setRestaurantName(res.data.restaurantName);
     setStaffName(res.data.staffName);
+    setLogoUrl(res.data.brand.logoUrl || "/logo-gold.png");
+    setCurrency(res.data.brand.currency || "EGP");
     setOrders(res.data.orders);
 
     // تنبيه عند وصول طلب جديد (بعد التحميل الأول فقط)
@@ -212,9 +219,18 @@ export function StaffShell({ slug }: { slug?: string }) {
     <main className="min-h-screen bg-background pb-10">
       <header className="border-b border-gold/15 bg-[#171310]">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-3 px-4 py-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-gold to-[#a87a2b] text-background">
-            <UtensilsCrossed className="h-5 w-5" />
-          </div>
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt={restaurantName || "شعار المطعم"}
+              className="h-10 w-10 shrink-0 rounded-xl object-cover ring-2 ring-gold/60"
+            />
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-gold to-[#a87a2b] text-background">
+              <UtensilsCrossed className="h-5 w-5" />
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <h1 className="flex items-center gap-2 text-sm font-black text-cream">
               {restaurantName}
@@ -335,7 +351,7 @@ export function StaffShell({ slug }: { slug?: string }) {
                   ) : null}
                 </div>
                 <p className="text-lg font-black text-gold">
-                  {formatPrice(o.total, "EGP", "ar")}
+                  {formatPrice(o.total, currency, "ar")}
                 </p>
               </div>
 
@@ -357,26 +373,37 @@ export function StaffShell({ slug }: { slug?: string }) {
                 ))}
               </ul>
 
-              {meta.next ? (
+              <div className="mt-4 flex gap-2">
                 <button
                   type="button"
-                  disabled={busy === o.id}
-                  onClick={() => advance(o.id, meta.next!)}
-                  className={cn(
-                    "mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl font-black transition-all active:scale-[0.99] disabled:opacity-60",
-                    o.status === "new"
-                      ? "bg-gradient-to-r from-gold to-[#a87a2b] text-background shadow-[0_10px_30px_-10px_rgba(212,168,83,0.6)]"
-                      : "border border-gold/40 bg-gold/10 text-gold hover:bg-gold/20",
-                  )}
+                  onClick={() => setSelected(o)}
+                  className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-gold/40 bg-gold/10 text-sm font-black text-gold transition-all hover:bg-gold/20 active:scale-[0.99]"
                 >
-                  {busy === o.id ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {o.status === "new" ? "بدء التحضير" : "تم التسليم"}
+                  <Eye className="h-4 w-4" />
+                  تفاصيل الطلب
                 </button>
-              ) : null}
+                {meta.next ? (
+                  <button
+                    type="button"
+                    disabled={busy === o.id}
+                    onClick={() => advance(o.id, meta.next!)}
+                    className={cn(
+                      "flex h-11 flex-1 items-center justify-center gap-2 rounded-xl font-black transition-all active:scale-[0.99] disabled:opacity-60",
+                      o.status === "new"
+                        ? "bg-gradient-to-r from-gold to-[#a87a2b] text-background shadow-[0_10px_30px_-10px_rgba(212,168,83,0.6)]"
+                        : "border border-gold/40 bg-gold/10 text-gold hover:bg-gold/20",
+                    )}
+                  >
+                    {busy === o.id ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {o.status === "new" ? "بدء التحضير" : "تم التسليم"}
+                  </button>
+                ) : null}
+              </div>
             </div>
           );
         })}
       </div>
+      <OrderDetailsDialog order={selected} currency={currency} onClose={() => setSelected(null)} />
     </main>
   );
 }

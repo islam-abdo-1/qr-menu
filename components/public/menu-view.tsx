@@ -1,18 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { motion } from "framer-motion";
-import { ChevronDown, Heart, Languages, LogOut, ScanLine, ShoppingBag, Sparkles, UtensilsCrossed } from "lucide-react";
+import { ChevronDown, ScanLine, ShoppingBag, Sparkles, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
 import { applyDiscount } from "@/lib/utils";
 import type { MenuData } from "@/lib/data";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
-import { createClient } from "@/lib/supabase/client";
-import { getFavoriteItemsAction, toggleFavoriteAction } from "@/lib/actions/favorites";
 import { ItemCard } from "@/components/public/item-card";
-import { FavoritesAuth } from "@/components/public/favorites-auth";
 import { CartDrawer } from "@/components/public/cart-drawer";
 import { ShareMenu } from "@/components/public/share-menu";
 import { loadCart, saveCart, cartCount, cartTotal, cartKey, type CartItem } from "@/lib/cart";
@@ -21,19 +17,9 @@ type Props = {
   dict: Dictionary;
   data: MenuData;
   locale: "ar" | "en";
-  langHref?: string;
   slug?: string;
   /** رابط المنيو المطلق — لمشاركة المنيو */
   menuUrl: string;
-};
-
-type FavoriteItem = {
-  id: string;
-  name: string;
-  price: number;
-  discountPercentage: number | null;
-  imageUrl: string | null;
-  categoryName: string;
 };
 
 /** فاصل زخرفي: خط — معيّن — خط */
@@ -49,7 +35,7 @@ function Ornament({ className }: { className?: string }) {
   );
 }
 
-export function MenuView({ dict, data, locale, langHref, slug, menuUrl }: Props) {
+export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
   const categories = data.categories;
   const bestSellers = data.bestSellers;
   const restaurantName =
@@ -145,81 +131,7 @@ export function MenuView({ dict, data, locale, langHref, slug, menuUrl }: Props)
   const [active, setActive] = useState<string | null>(categories[0]?.id ?? null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const categoryKey = categories.map((c) => c.id).join("|");
-  const logoUrl = data.settings?.logoUrl ?? null;
-
-  /* ───── التفضيلات ───── */
-  const [favItems, setFavItems] = useState<FavoriteItem[]>([]);
-  const [authOpen, setAuthOpen] = useState(false);
-  const [favIds, setFavIds] = useState<Set<string>>(new Set());
-  const pendingFav = useRef<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    getFavoriteItemsAction().then((res) => {
-      if (cancelled || !res.ok) return;
-      setFavItems(res.data);
-      setFavIds(new Set(res.data.map((f) => f.id)));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const refreshFavorites = useCallback(async () => {
-    const res = await getFavoriteItemsAction();
-    if (!res.ok) return;
-    setFavItems(res.data);
-    setFavIds(new Set(res.data.map((f) => f.id)));
-  }, []);
-
-  const handleToggleFavorite = useCallback(
-    async (itemId: string) => {
-      const res = await toggleFavoriteAction(itemId);
-      if (!res.ok) {
-        if (res.error.includes("سجّل")) {
-          pendingFav.current = itemId;
-          setAuthOpen(true);
-        }
-        return;
-      }
-      setFavIds((prev) => {
-        const next = new Set(prev);
-        if (res.data.favorite) next.add(itemId);
-        else next.delete(itemId);
-        return next;
-      });
-      await refreshFavorites();
-    },
-    [refreshFavorites],
-  );
-
-  const handleAuthed = useCallback(async () => {
-    if (pendingFav.current) {
-      const id = pendingFav.current;
-      pendingFav.current = null;
-      await toggleFavoriteAction(id);
-    }
-    // الجلسة الجديدة قد لا تنتشر في الكوكيز فورًا — أعد المحاولة حتى تظهر القائمة
-    for (let i = 0; i < 4; i++) {
-      await refreshFavorites();
-      await new Promise((r) => setTimeout(r, 700));
-    }
-  }, [refreshFavorites]);
-
-  const signOut = useCallback(async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    setFavItems([]);
-    setFavIds(new Set());
-  }, []);
-
-  const jumpFav = useCallback(() => {
-    const el = document.getElementById("favorites");
-    if (el) {
-      const y = el.getBoundingClientRect().top + window.scrollY - 96;
-      window.scrollTo({ top: y, behavior: "smooth" });
-    }
-  }, []);
+  const logoUrl = data.settings?.logoUrl ?? "/logo-gold.png";
 
   useEffect(() => {
     if (categories.length === 0) return;
@@ -389,89 +301,8 @@ export function MenuView({ dict, data, locale, langHref, slug, menuUrl }: Props)
                 })}
               </div>
               <ShareMenu menuUrl={menuUrl} shareText={locale === "ar" ? "تفضل قائمة الطعام" : "Check out the menu"} />
-              <Link
-                href={langHref ?? (locale === "ar" ? "/en" : "/")}
-                className="flex shrink-0 items-center gap-1.5 rounded-full border border-gold/40 bg-gold/15 px-3.5 py-1.5 text-xs font-black text-[#f2d589] transition-colors hover:bg-gold/25"
-                aria-label={locale === "ar" ? "English" : "العربية"}
-              >
-                <Languages className="h-4 w-4" />
-                {dict.header.languageShort}
-              </Link>
-              {favItems.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={jumpFav}
-                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#EF4444]/40 bg-[#EF4444]/10 px-3.5 py-1.5 text-xs font-black text-[#EF4444] transition-colors hover:bg-[#EF4444]/20"
-                  title={locale === "ar" ? "مفضلتي" : "My favorites"}
-                >
-                  <Heart className="h-3.5 w-3.5 fill-[#EF4444]" />
-                  {favItems.length}
-                </button>
-              ) : null}
             </div>
           </nav>
-
-          {/* ───── قسم مفضلتي ───── */}
-          {favItems.length > 0 ? (
-            <section id="favorites" className="container mt-10 max-w-5xl scroll-mt-32">
-              <motion.div
-                className="mb-8 text-center"
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
-                transition={{ duration: 0.5 }}
-              >
-                <h2 className="font-display flex items-center justify-center gap-3 text-4xl font-bold text-gold-gradient drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)] sm:text-5xl">
-                  <Heart className="h-9 w-9 fill-[#EF4444] text-[#EF4444]" />
-                  {locale === "ar" ? "مفضلتي" : "My Favorites"}
-                </h2>
-                <Ornament className="mt-4 text-gold" />
-                <button
-                  type="button"
-                  onClick={signOut}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-3 py-1.5 text-[11px] font-bold text-cream/55 transition-colors hover:border-destructive/40 hover:text-destructive"
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                  {locale === "ar" ? "تسجيل الخروج" : "Sign out"}
-                </button>
-              </motion.div>
-
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {favItems.map((f, i) => (
-                  <ItemCard
-                    key={f.id}
-                    item={{
-                      id: f.id,
-                      name: f.name,
-                      description: null,
-                      price: f.price,
-                      discountPercentage: f.discountPercentage,
-                      sizes: [],
-                      imageUrl: f.imageUrl,
-                      isAvailable: true,
-                    }}
-                    currency={currency}
-                    locale={locale}
-                    index={i}
-                    delay={0}
-                    themePrimary={themePrimary}
-                    favorite={true}
-                    onToggleFavorite={() => handleToggleFavorite(f.id)}
-                    qtyInCart={cartQtyOf(f.id)}
-                    onAdd={(sel) =>
-                      addToCart(
-                        { id: f.id, name: f.name, price: f.price, imageUrl: f.imageUrl },
-                        {
-                          sizeCode: sel?.sizeCode,
-                          price: sel?.price ?? applyDiscount(f.price, f.discountPercentage),
-                        },
-                      )
-                    }
-                  />
-                ))}
-              </div>
-            </section>
-          ) : null}
 
           {/* ───── الأقسام والعناصر ───── */}
           <div className="container mt-14 max-w-5xl space-y-16 pb-4">
@@ -507,8 +338,6 @@ export function MenuView({ dict, data, locale, langHref, slug, menuUrl }: Props)
                       index={itemIndex}
                       delay={index * 0.02}
                       themePrimary={themePrimary}
-                      favorite={favIds.has(item.id)}
-                      onToggleFavorite={() => handleToggleFavorite(item.id)}
                       qtyInCart={cartQtyOf(item.id)}
                       bestSeller={bestSellers.includes(item.id)}
                       onAdd={(sel) =>
@@ -528,13 +357,6 @@ export function MenuView({ dict, data, locale, langHref, slug, menuUrl }: Props)
           </div>
         </>
       )}
-
-      {/* ───── نافذة تسجيل/دخول الزبون ───── */}
-      <FavoritesAuth
-        open={authOpen}
-        onOpenChange={setAuthOpen}
-        onAuthed={handleAuthed}
-      />
 
       {/* ───── درج السلة ───── */}
       <CartDrawer
@@ -589,16 +411,10 @@ export function MenuView({ dict, data, locale, langHref, slug, menuUrl }: Props)
             aria-hidden
           />
           <div className="container flex flex-col items-center gap-4">
-            {logoUrl ? (
-              <div className="relative h-16 w-16 overflow-hidden rounded-full border-2 border-gold/70 bg-[#0D0A08] shadow-[0_0_30px_-6px_rgba(212,168,83,0.5)]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logoUrl} alt={restaurantName} className="h-full w-full object-cover" />
-              </div>
-            ) : (
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-gold/30 bg-gold/10 text-gold">
-                <UtensilsCrossed className="h-6 w-6" />
-              </span>
-            )}
+            <div className="relative h-16 w-16 overflow-hidden rounded-full border-2 border-gold/70 bg-[#0D0A08] shadow-[0_0_30px_-6px_rgba(212,168,83,0.5)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logoUrl} alt={restaurantName} className="h-full w-full object-cover" />
+            </div>
             <p className="font-display text-3xl font-bold text-gold-gradient">
               {restaurantName}
             </p>

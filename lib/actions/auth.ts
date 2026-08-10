@@ -6,8 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { credentialsSchema, signupSchema } from "@/lib/validations";
 import { ActionResult, fail, fromZod, ok } from "@/lib/actions/helpers";
 import { prisma } from "@/lib/prisma";
-import { revalidatePath, revalidateTag } from "next/cache";
-import { AUTH_USER_TAG } from "@/lib/data";
+import { revalidatePath } from "next/cache";
 import { generateUniqueStaffPin } from "@/lib/staff-pin";
 
 export async function signInAction(
@@ -70,7 +69,6 @@ export async function signOutAction(): Promise<ActionResult<null>> {
     const { error } = await supabase.auth.signOut();
     if (error) return fail("تعذّر تسجيل الخروج");
     revalidatePath("/", "layout");
-    revalidateTag(AUTH_USER_TAG);
     return ok(null);
   } catch {
     return fail("تعذّر تسجيل الخروج من الحساب");

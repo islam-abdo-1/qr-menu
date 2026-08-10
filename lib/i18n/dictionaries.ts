@@ -1,7 +1,6 @@
 export const dictionaries = {
   ar: {
     dir: "rtl",
-    header: { languageShort: "English" },
     hero: {
       welcome: "أهلًا بكم في",
       tagline: "نكهات أصيلة تُقدَّم بشغف، ننتظركم على مائدتنا",
@@ -25,38 +24,11 @@ export const dictionaries = {
       download: "تحميل PNG للطباعة",
     },
   },
-  en: {
-    dir: "ltr",
-    header: { languageShort: "العربية" },
-    hero: {
-      welcome: "Welcome to",
-      tagline: "Authentic flavors, served with passion — your table is waiting",
-      explore: "Explore the menu",
-      scanHint: "Scan the QR code on your table to open the menu on your phone",
-    },
-    menu: { empty: "No items available right now — check back soon!" },
-    footer: "Scan to browse the full menu on your phone",
-    login: {
-      title: "Admin area",
-      subtitle: "Sign in to manage your menu",
-      email: "Email address",
-      password: "Password",
-      submit: "Sign in",
-      submitting: "Signing in...",
-      error: "Invalid credentials",
-    },
-    qr: {
-      title: "Menu QR code",
-      desc: "Print this code and place it on tables",
-      download: "Download PNG for printing",
-    },
-  },
 } as const;
 
-/** شكل القاموس موحّد للغتين (عربي/إنجليزي) حتى لا ينكسر الكود */
+/** شكل القاموس موحّد — العربية هي اللغة الوحيدة للمنيو العام */
 export type Dictionary = {
   dir: string;
-  header: { languageShort: string };
   hero: {
     welcome: string;
     tagline: string;
@@ -83,6 +55,6 @@ export type Dictionary = {
 
 export const defaultLocale = "ar";
 
-export function getDictionary(locale: string): Dictionary {
-  return locale === "en" ? dictionaries.en : dictionaries.ar;
+export function getDictionary(): Dictionary {
+  return dictionaries.ar;
 }

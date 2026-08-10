@@ -3,11 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { toast } from "sonner";
-import { Check, Copy, Download, Eye, QrCode as QrIcon, Ruler } from "lucide-react";
+import { Check, Copy, Download, QrCode as QrIcon, Ruler } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { getVisitsAction, type VisitsStats } from "@/lib/actions/reports";
 
 const QR_DARK = "#1F1A17";
 const QR_LIGHT = "#FFFFFF";
@@ -22,13 +21,6 @@ export function QrPanel({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [url, setUrl] = useState<string>("");
   const [copied, setCopied] = useState(false);
-  const [visits, setVisits] = useState<VisitsStats | null>(null);
-
-  useEffect(() => {
-    getVisitsAction().then((res) => {
-      if (res.ok) setVisits(res.data);
-    });
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -135,27 +127,6 @@ export function QrPanel({
             <Download className="h-4 w-4" />
             تحميل PNG للطباعة (1024px)
           </Button>
-        </div>
-
-        {/* عدّاد فتحات المنيو */}
-        <div className="w-full max-w-md">
-          <div className="flex items-center gap-2">
-            <Eye className="h-4 w-4 text-gold" />
-            <h3 className="text-sm font-black text-cream">فتحات الرمز (QR visits)</h3>
-          </div>
-          <p className="mt-0.5 text-xs text-cream/55">
-            عدد مرات فتح عملائك لرابط المنيو — يتحدث تلقائيًا
-          </p>
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-gold/20 bg-gold/5 p-4 text-center">
-              <p className="font-display text-3xl font-black text-gold">{visits?.today ?? "—"}</p>
-              <p className="mt-1 text-xs font-bold text-cream/60">فتحات اليوم</p>
-            </div>
-            <div className="rounded-2xl border border-border bg-background/60 p-4 text-center">
-              <p className="font-display text-3xl font-black text-cream">{visits?.thisMonth ?? "—"}</p>
-              <p className="mt-1 text-xs font-bold text-cream/60">فتحات هذا الشهر</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>

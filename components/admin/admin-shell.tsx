@@ -8,7 +8,6 @@ import {
   BarChart3,
   ClipboardList,
   ExternalLink,
-  LayoutDashboard,
   LogOut,
   QrCode,
   Settings,
@@ -128,22 +127,16 @@ export function AdminShell({ data }: { data: AdminData }) {
       <aside className="flex flex-col border-b border-gold/15 bg-[#171310] lg:min-h-screen lg:w-72 lg:border-b-0 lg:border-e">
         <div className="px-6 py-6">
           <div className="flex items-center gap-3">
-            {data.settings.logoUrl ? (
-              <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl ring-2 ring-gold/60 ring-offset-2 ring-offset-[#171310]">
-                <Image
-                  src={data.settings.logoUrl}
-                  alt="شعار المطعم"
-                  fill
-                  sizes="44px"
-                  className="object-cover"
-                  unoptimized
-                />
-              </div>
-            ) : (
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-gold to-[#a87a2b] text-background shadow-[0_8px_24px_-8px_rgba(212,168,83,0.6)]">
-                <LayoutDashboard className="h-5 w-5" />
-              </div>
-            )}
+            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl ring-2 ring-gold/60 ring-offset-2 ring-offset-[#171310]">
+              <Image
+                src={data.settings.logoUrl || "/logo-gold.png"}
+                alt="شعار المطعم"
+                fill
+                sizes="44px"
+                className="object-cover"
+                unoptimized
+              />
+            </div>
             <div className="min-w-0">
               <p className="text-sm font-black leading-tight text-cream">لوحة الإدارة</p>
               <p className="truncate text-xs text-cream/65">
@@ -233,7 +226,11 @@ export function AdminShell({ data }: { data: AdminData }) {
           </div>
 
           {tab === "orders" && (
-            <OrdersPanel orders={orders} onStatusChanged={onOrderStatusChanged} />
+            <OrdersPanel
+              orders={orders}
+              onStatusChanged={onOrderStatusChanged}
+              currency={data.settings.currency || "EGP"}
+            />
           )}
           {tab === "reports" && <ReportsPanel />}
           {tab === "items" && <ItemsPanel data={data} onChanged={onChanged} />}

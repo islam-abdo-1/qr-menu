@@ -50,7 +50,7 @@ const CURRENCIES = [
 export function SettingsPanel({ settings, onSaved, dashboardUrl }: Props) {
   const [name, setName] = useState(settings.restaurantName);
   const [currency, setCurrency] = useState(settings.currency || "EGP");
-  const [logoUrl, setLogoUrl] = useState<string | null>(settings.logoUrl || null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(settings.logoUrl || "/logo-gold.png");
   const [saving, setSaving] = useState(false);
 
   async function submit(e: React.FormEvent) {

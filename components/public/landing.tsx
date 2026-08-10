@@ -2,50 +2,26 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, BellRing, Heart, QrCode, Rocket, ScanLine, Sparkles, Store, UtensilsCrossed } from "lucide-react";
-
-type Lang = "ar" | "en";
+import { BellRing, QrCode, Rocket, ScanLine, Sparkles, Store, UtensilsCrossed } from "lucide-react";
 
 const T = {
-  ar: {
-    badge: "منصّة المنيو الرقمي",
-    title1: "منيو رقمي لمطعمك",
-    title2: "ينطلق في دقيقة",
-    subtitle: "أنشئ قائمة طعام إلكترونية لرابط خاص بمطعمك، واجعل زبائنك يطلبون مباشرة من موبايلهم — بدون تطبيقات وبدون تعقيد.",
-    cta: "أنشئ مطعمك مجانًا",
-    demo: "شاهد مثالًا حيًا",
-    featuresTitle: "كل ما يحتاجه مطعمك",
-    features: [
-      { icon: QrCode, title: "رمز QR للطاولات", desc: "رمز جاهز للطباعة — الزبون يمسح ويفتح القائمة فورًا من موبايله." },
-      { icon: Heart, title: "قائمة تفضيلات", desc: "زبائنك يحفظون أطباقهم المفضلة بحساب بسيط ويصلون لها على أي جهاز." },
-      { icon: BellRing, title: "استقبال الطلبات", desc: "الطلب يوصل لقسم الموظفين لحظيًا مع تنبيه صوتي وحالات متابعة." },
-      { icon: Store, title: "لوحة تحكم كاملة", desc: "أضف الأقسام والعناصر والصور والأسعار والمقاسات والخصومات، حدّد الطاولات والموظفين، تابع الطلبات لحظيًا وصدر سجل العملاء — وكل تعديل يظهر فورًا لعملائك." },
-    ],
-    footer: "قائمة رقمية — مسح ضوئي — طلب مباشر",
-    lang: "English",
-  },
-  en: {
-    badge: "Digital Menu Platform",
-    title1: "A digital menu for your",
-    title2: "restaurant in minutes",
-    subtitle: "Create an online menu with your own link, and let customers order straight from their phones — no apps, no hassle.",
-    cta: "Create your restaurant free",
-    demo: "See a live example",
-    featuresTitle: "Everything your restaurant needs",
-    features: [
-      { icon: QrCode, title: "Table QR codes", desc: "Print-ready QR — customers scan and open your menu instantly." },
-      { icon: Heart, title: "Favorites", desc: "Customers save their favorite dishes with a simple account, on any device." },
-      { icon: BellRing, title: "Order intake", desc: "Orders reach your staff in real time with sound alerts and status tracking." },
-      { icon: Store, title: "Full dashboard", desc: "Add categories, items, photos, prices, sizes and discounts, manage tables and staff, track orders live and export your customer list — every change goes live instantly." },
-    ],
-    footer: "Digital menu — scan — order directly",
-    lang: "العربية",
-  },
+  badge: "منصّة المنيو الرقمي",
+  title1: "منيو رقمي لمطعمك",
+  title2: "ينطلق في دقيقة",
+  subtitle: "أنشئ قائمة طعام إلكترونية لرابط خاص بمطعمك، واجعل زبائنك يطلبون مباشرة من موبايلهم — بدون تطبيقات وبدون تعقيد.",
+  cta: "أنشئ مطعمك مجانًا",
+  demo: "شاهد مثالًا حيًا",
+  featuresTitle: "كل ما يحتاجه مطعمك",
+  features: [
+    { icon: QrCode, title: "رمز QR للطاولات", desc: "رمز جاهز للطباعة — الزبون يمسح ويفتح القائمة فورًا من موبايله." },
+    { icon: BellRing, title: "استقبال الطلبات", desc: "الطلب يوصل لقسم الموظفين لحظيًا مع تنبيه صوتي وحالات متابعة." },
+    { icon: Store, title: "لوحة تحكم كاملة", desc: "أضف الأقسام والعناصر والصور والأسعار والمقاسات والخصومات، حدّد الطاولات والموظفين، تابع الطلبات لحظيًا وصدر سجل عملاء التوصيل — وكل تعديل يظهر فورًا لعملائك." },
+  ],
+  footer: "قائمة رقمية — مسح ضوئي — طلب مباشر",
 };
 
-export function Landing({ lang = "ar" }: { lang?: Lang }) {
-  const t = T[lang];
-  const other: Lang = lang === "ar" ? "en" : "ar";
+export function Landing() {
+  const t = T;
 
   return (
     <main className="texture-dots min-h-screen overflow-hidden bg-background text-cream">
@@ -117,7 +93,7 @@ export function Landing({ lang = "ar" }: { lang?: Lang }) {
 
           <p className="mt-2 flex items-center gap-1.5 text-xs text-cream/70">
             <UtensilsCrossed className="h-3.5 w-3.5 text-gold" />
-            {lang === "ar" ? "ابدأ الآن — الإعداد خلال دقيقة واحدة" : "Start now — set up in under a minute"}
+            ابدأ الآن — الإعداد خلال دقيقة واحدة
           </p>
         </div>
       </header>
@@ -165,13 +141,6 @@ export function Landing({ lang = "ar" }: { lang?: Lang }) {
             <ScanLine className="h-4 w-4 text-gold" />
             {t.footer}
           </p>
-          <Link
-            href={other === "ar" ? "/" : "/en"}
-            className="flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-4 py-1.5 text-xs font-black text-gold transition-colors hover:bg-gold/20"
-          >
-            <ArrowLeft className={`h-3.5 w-3.5 ${lang === "ar" ? "rotate-180" : ""}`} />
-            {t.lang}
-          </Link>
           <p className="text-xs text-cream/60">© {new Date().getFullYear()} QR Menu</p>
         </div>
       </footer>

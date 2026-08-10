@@ -12,10 +12,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const restaurant = await prisma.restaurant.findUnique({
     where: { slug },
-    select: { name: true },
+    select: { name: true, settings: { select: { restaurantName: true } } },
   });
+  const name = restaurant?.settings?.restaurantName || restaurant?.name;
   return {
-    title: restaurant ? `${restaurant.name} — شاشة الموظفين` : "شاشة الموظفين — QR Menu",
+    title: name ? `${name} — شاشة الموظفين` : "شاشة الموظفين — QR Menu",
   };
 }
 

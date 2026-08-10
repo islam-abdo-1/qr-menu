@@ -39,7 +39,7 @@ export default async function RestaurantMenuPage({
 }) {
   const [data, dict] = await Promise.all([
     getMenuData(slug),
-    Promise.resolve(getDictionary("ar")),
+    Promise.resolve(getDictionary()),
   ]);
   if (!data) notFound();
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
@@ -49,7 +49,6 @@ export default async function RestaurantMenuPage({
       data={data}
       locale="ar"
       slug={slug}
-      langHref={`/m/${slug}/en`}
       menuUrl={`${siteUrl}/m/${slug}`}
     />
   );
