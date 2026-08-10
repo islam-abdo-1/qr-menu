@@ -42,9 +42,17 @@ export default async function RestaurantMenuEnPage({
     Promise.resolve(getDictionary("en")),
   ]);
   if (!data) notFound();
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
   return (
     <div dir="ltr" lang="en">
-      <MenuView dict={dict} data={data} locale="en" slug={slug} langHref={`/m/${slug}`} />
+      <MenuView
+        dict={dict}
+        data={data}
+        locale="en"
+        slug={slug}
+        langHref={`/m/${slug}`}
+        menuUrl={`${siteUrl}/m/${slug}/en`}
+      />
     </div>
   );
 }

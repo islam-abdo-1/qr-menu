@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Amiri, Cairo } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { PwaInstallBanner } from "@/components/pwa/install-banner";
+import { RegisterPWA } from "@/components/pwa/register-sw";
 import "./globals.css";
 
 export const revalidate = 300;
@@ -22,7 +23,7 @@ const amiri = Amiri({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://qr-menu-lyart-gamma.vercel.app",
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://site-menu.ddnsfree.com",
   ),
   title: "QR Menu — مطعمك هنا",
   description: "قائمة طعام رقمية بأكواد QR",
@@ -62,6 +63,7 @@ export default function RootLayout({
         {children}
         <Toaster position="top-center" richColors />
         <PwaInstallBanner />
+        <RegisterPWA />
       </body>
     </html>
   );

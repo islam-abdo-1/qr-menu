@@ -9,9 +9,26 @@ export function cn(...inputs: ClassValue[]) {
 export function formatPrice(amount: number, currency: string, locale = "ar-EG") {
   const symbols: Record<string, string> = {
     EGP: "ج.م",
-    USD: "$",
     SAR: "ر.س",
     AED: "د.إ",
+    KWD: "د.ك",
+    QAR: "ر.ق",
+    BHD: "د.ب",
+    OMR: "ر.ع",
+    JOD: "د.أ",
+    IQD: "د.ع",
+    LBP: "ل.ل",
+    SYP: "ل.س",
+    LYD: "د.ل",
+    TND: "د.ت",
+    DZD: "د.ج",
+    MAD: "د.م",
+    SDG: "ج.س",
+    YER: "ر.ي",
+    SOS: "ش.ص",
+    DJF: "ف.ج",
+    KMF: "ف.ق",
+    MRU: "أ.م",
   };
   const suffix = symbols[currency] ?? currency;
   const value = amount.toLocaleString(locale === "en" ? "en-US" : "ar-EG", {

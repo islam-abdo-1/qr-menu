@@ -14,6 +14,7 @@ import { getFavoriteItemsAction, toggleFavoriteAction } from "@/lib/actions/favo
 import { ItemCard } from "@/components/public/item-card";
 import { FavoritesAuth } from "@/components/public/favorites-auth";
 import { CartDrawer } from "@/components/public/cart-drawer";
+import { ShareMenu } from "@/components/public/share-menu";
 import { loadCart, saveCart, cartCount, cartTotal, cartKey, type CartItem } from "@/lib/cart";
 
 type Props = {
@@ -22,6 +23,8 @@ type Props = {
   locale: "ar" | "en";
   langHref?: string;
   slug?: string;
+  /** رابط المنيو المطلق — لمشاركة المنيو */
+  menuUrl: string;
 };
 
 type FavoriteItem = {
@@ -46,7 +49,7 @@ function Ornament({ className }: { className?: string }) {
   );
 }
 
-export function MenuView({ dict, data, locale, langHref, slug }: Props) {
+export function MenuView({ dict, data, locale, langHref, slug, menuUrl }: Props) {
   const categories = data.categories;
   const bestSellers = data.bestSellers;
   const restaurantName =
@@ -65,6 +68,19 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
   useEffect(() => {
     if (slug) saveCart(slug, cart);
   }, [slug, cart]);
+
+  // عدّاد فتحات المنيو (QR visits) — مرة واحدة لكل زيارة، خارج كاش ISR
+  useEffect(() => {
+    if (!slug) return;
+    fetch("/api/visits", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug }),
+      keepalive: true,
+    }).catch(() => {
+      // العدّاد غير حرج — لا نعطل تجربة العميل أبدًا
+    });
+  }, [slug]);
 
   const addToCart = useCallback(
     (
@@ -372,11 +388,13 @@ export function MenuView({ dict, data, locale, langHref, slug }: Props) {
                   );
                 })}
               </div>
+              <ShareMenu menuUrl={menuUrl} shareText={locale === "ar" ? "تفضل قائمة الطعام" : "Check out the menu"} />
               <Link
                 href={langHref ?? (locale === "ar" ? "/en" : "/")}
-                className="flex shrink-0 items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-3.5 py-1.5 text-xs font-black text-gold transition-colors hover:bg-gold/20"
+                className="flex shrink-0 items-center gap-1.5 rounded-full border border-gold/40 bg-gold/15 px-3.5 py-1.5 text-xs font-black text-[#f2d589] transition-colors hover:bg-gold/25"
+                aria-label={locale === "ar" ? "English" : "العربية"}
               >
-                <Languages className="h-3.5 w-3.5" />
+                <Languages className="h-4 w-4" />
                 {dict.header.languageShort}
               </Link>
               {favItems.length > 0 ? (

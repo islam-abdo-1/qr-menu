@@ -25,9 +25,26 @@ type Props = {
 
 const CURRENCIES = [
   { code: "EGP", label: "جنيه مصري (ج.م)" },
-  { code: "USD", label: "دولار ($)" },
   { code: "SAR", label: "ريال سعودي (ر.س)" },
   { code: "AED", label: "درهم إماراتي (د.إ)" },
+  { code: "KWD", label: "دينار كويتي (د.ك)" },
+  { code: "QAR", label: "ريال قطري (ر.ق)" },
+  { code: "BHD", label: "دينار بحريني (د.ب)" },
+  { code: "OMR", label: "ريال عماني (ر.ع)" },
+  { code: "JOD", label: "دينار أردني (د.أ)" },
+  { code: "IQD", label: "دينار عراقي (د.ع)" },
+  { code: "LBP", label: "ليرة لبنانية (ل.ل)" },
+  { code: "SYP", label: "ليرة سورية (ل.س)" },
+  { code: "LYD", label: "دينار ليبي (د.ل)" },
+  { code: "TND", label: "دينار تونسي (د.ت)" },
+  { code: "DZD", label: "دينار جزائري (د.ج)" },
+  { code: "MAD", label: "درهم مغربي (د.م)" },
+  { code: "SDG", label: "جنيه سوداني (ج.س)" },
+  { code: "YER", label: "ريال يمني (ر.ي)" },
+  { code: "SOS", label: "شلن صومالي (ش.ص)" },
+  { code: "DJF", label: "فرنك جيبوتي (ف.ج)" },
+  { code: "KMF", label: "فرنك قمري (ف.ق)" },
+  { code: "MRU", label: "أوقية موريتانية (أ.م)" },
 ];
 
 export function SettingsPanel({ settings, onSaved, dashboardUrl }: Props) {

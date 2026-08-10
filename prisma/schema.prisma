@@ -130,6 +130,7 @@ model DayStat {
   orders       Int        @default(0)
   dineIn       Int        @default(0)
   delivery     Int        @default(0)
+  scans        Int        @default(0) // فتحات رابط المنيو (عدّاد QR) — تُحدَّث لحظة فتح العميل للصفحة
 
   @@unique([restaurantId, date])
 }

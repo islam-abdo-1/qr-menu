@@ -219,16 +219,20 @@ export function StaffPanel({ staffPin, slug, onSaved }: Props) {
             <Label>الموظفون — أضف أسماء فريقك (يدخل كل واحد باسمه)</Label>
           </div>
 
-          <form onSubmit={handleAddStaff} className="flex gap-2">
+          <form onSubmit={handleAddStaff} className="flex flex-col gap-2 sm:flex-row">
             <input
               value={staffName}
               onChange={(e) => setStaffName(e.target.value)}
               placeholder="اسم الموظف (مثال: أحمد)"
               required
               maxLength={60}
-              className="h-11 flex-1 rounded-xl border border-input bg-background px-3.5 text-sm outline-none transition-all focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
+              className="h-11 w-full flex-1 rounded-xl border border-input bg-background px-3.5 text-sm outline-none transition-all focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
             />
-            <Button type="submit" disabled={staffBusy} className="h-11 rounded-xl px-5">
+            <Button
+              type="submit"
+              disabled={staffBusy}
+              className="h-11 w-full shrink-0 rounded-xl px-5 sm:w-auto"
+            >
               {staffBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               إضافة
             </Button>

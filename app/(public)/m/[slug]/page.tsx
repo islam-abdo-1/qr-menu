@@ -42,5 +42,15 @@ export default async function RestaurantMenuPage({
     Promise.resolve(getDictionary("ar")),
   ]);
   if (!data) notFound();
-  return <MenuView dict={dict} data={data} locale="ar" slug={slug} langHref={`/m/${slug}/en`} />;
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
+  return (
+    <MenuView
+      dict={dict}
+      data={data}
+      locale="ar"
+      slug={slug}
+      langHref={`/m/${slug}/en`}
+      menuUrl={`${siteUrl}/m/${slug}`}
+    />
+  );
 }

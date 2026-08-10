@@ -129,3 +129,49 @@ export async function getSalesReportAction(
     return fail("تعذّر تحميل التقرير");
   }
 }
+
+/* ─────────────────────────── عدّاد فتحات المنيو (QR visits) ─────────────────────────── */
+
+export type VisitsStats = {
+  today: number;
+  thisMonth: number;
+};
+
+/** تجميع عدّاد الفتحات من DayStat — يومي + شهري (قيمة مستقلة عن كاش التقارير) */
+const loadVisits = cache(
+  async (restaurantId: string): Promise<VisitsStats> => {
+    const todayStr = cairoDate(new Date());
+    const monthStr = todayStr.slice(0, 7);
+
+    const rows = await prisma.$queryRaw<{ date: Date; scans: number }[]>`
+      SELECT "date", "scans"
+      FROM "DayStat"
+      WHERE "restaurantId" = ${restaurantId}
+        AND "date" >= ${`${monthStr}-01`}::date
+      ORDER BY "date" ASC
+    `;
+    const totals = rows.reduce(
+      (acc, r) => {
+        const iso = r.date.toISOString().slice(0, 10);
+        acc.thisMonth += r.scans;
+        if (iso === todayStr) acc.today += r.scans;
+        return acc;
+      },
+      { today: 0, thisMonth: 0 },
+    );
+    return totals;
+  },
+  ["qr-menu-visits"],
+  { tags: ["visits"], revalidate: 60 },
+);
+
+export async function getVisitsAction(): Promise<ActionResult<VisitsStats>> {
+  try {
+    const restaurant = await getOwnerRestaurant();
+    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    return ok(await loadVisits(restaurant.id));
+  } catch (e) {
+    console.error("[visits] load failed:", e);
+    return fail("تعذّر تحميل عدّاد الفتحات");
+  }
+}
