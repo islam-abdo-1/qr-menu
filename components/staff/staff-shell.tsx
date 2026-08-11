@@ -36,11 +36,11 @@ const STATUS_META: Record<OrderStatus, { label: string; next: OrderStatus | null
   done: { label: "تم التسليم", next: null, cls: "bg-cream/10 text-cream/60 border-border" },
 };
 
-export function StaffShell({ slug }: { slug?: string }) {
+export function StaffShell({ slug, logoUrl: initialLogoUrl = null }: { slug?: string; logoUrl?: string | null }) {
   const router = useRouter();
   const [restaurantName, setRestaurantName] = useState<string | null>(null);
   const [staffName, setStaffName] = useState<string | null>(null);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(initialLogoUrl);
   const [currency, setCurrency] = useState<string>("EGP");
   const [orders, setOrders] = useState<OrderView[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -154,9 +154,18 @@ export function StaffShell({ slug }: { slug?: string }) {
       <main className="texture-dots flex min-h-screen items-center justify-center bg-background px-4">
         <div className="w-full max-w-sm rounded-3xl border border-gold/20 bg-card p-8 shadow-elevated">
           <div className="mb-6 flex flex-col items-center gap-3 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gold to-[#a87a2b] text-background shadow-[0_10px_30px_-8px_rgba(212,168,83,0.6)]">
-              <UtensilsCrossed className="h-7 w-7" />
-            </div>
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoUrl}
+                alt="شعار المطعم"
+                className="h-14 w-14 rounded-2xl object-cover ring-2 ring-gold/50"
+              />
+            ) : (
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gold to-[#a87a2b] text-background shadow-[0_10px_30px_-8px_rgba(212,168,83,0.6)]">
+                <UtensilsCrossed className="h-7 w-7" />
+              </div>
+            )}
             <div>
               <h1 className="font-display text-2xl font-bold text-gold-gradient">شاشة الموظفين</h1>
               <p className="mt-1 text-xs text-cream/65">أدخل اسمك والكود السري لعرض طلبات المطعم</p>

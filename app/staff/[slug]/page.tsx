@@ -27,8 +27,8 @@ export default async function StaffRestaurantPage({
 }) {
   const restaurant = await prisma.restaurant.findUnique({
     where: { slug },
-    select: { name: true, staffPin: true },
+    select: { name: true, staffPin: true, settings: { select: { logoUrl: true } } },
   });
   if (!restaurant) notFound();
-  return <StaffShell slug={slug} />;
+  return <StaffShell slug={slug} logoUrl={restaurant.settings?.logoUrl ?? null} />;
 }

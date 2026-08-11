@@ -267,9 +267,18 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
           <nav className="sticky top-3 z-40 px-3 sm:top-5">
             <div className="mx-auto flex max-w-4xl items-center gap-2 rounded-2xl border border-gold/20 bg-[#191310]/90 py-2 ps-4 pe-2 shadow-elevated backdrop-blur-xl">
               <span className="hidden shrink-0 items-center gap-2 text-sm font-black text-cream md:flex">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-gold to-[#a87a2b] text-background">
-                  <UtensilsCrossed className="h-4 w-4" />
-                </span>
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoUrl}
+                    alt={restaurantName}
+                    className="h-7 w-7 rounded-lg object-cover ring-1 ring-gold/40"
+                  />
+                ) : (
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-gold to-[#a87a2b] text-background">
+                    <UtensilsCrossed className="h-4 w-4" />
+                  </span>
+                )}
                 <span className="max-w-32 truncate">{restaurantName}</span>
               </span>
               <div className="scrollbar-hide flex flex-1 items-center gap-1.5 overflow-x-auto py-1">

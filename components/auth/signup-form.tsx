@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { CheckCircle2, Loader2, Lock, Mail, ShieldCheck, Store, UtensilsCrossed } from "lucide-react";
+import { CheckCircle2, Loader2, Lock, Mail, ShieldCheck, Store } from "lucide-react";
 import { registerRestaurantAction } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils";
 
@@ -75,9 +75,14 @@ export function SignupForm() {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.15 }}
-            className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-gold to-[#a87a2b] text-background shadow-[0_12px_36px_-10px_rgba(212,168,83,0.6)]"
+            className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-gold to-[#a87a2b] shadow-[0_12px_36px_-10px_rgba(212,168,83,0.6)]"
           >
-            <UtensilsCrossed className="h-8 w-8" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo-gold.png"
+              alt="QR Menu"
+              className="h-full w-full object-cover"
+            />
           </motion.div>
           <div>
             <h1 className="font-display text-3xl font-bold text-gold-gradient">أنشئ مطعمك مجانًا</h1>
