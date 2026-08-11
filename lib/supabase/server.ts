@@ -1,6 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+/** خيارات كوكي الجلسة الموحدة — «تذكرني»: تبقى 30 يومًا بعد إغلاق المتصفح */
+const COOKIE_OPTIONS = {
+  maxAge: 60 * 60 * 24 * 30,
+  httpOnly: true,
+  sameSite: "lax" as const,
+  path: "/",
+};
+
 /**
  * Supabase client للاستخدام على الخادم (Server Actions / Route Handlers / Server Components).
  * - الجلسة محمولة في Cookies آمنة (HttpOnly) فقط — لا localStorage إطلاقًا.
@@ -22,6 +30,7 @@ export function createClient() {
         detectSessionInUrl: false,
         flowType: "pkce",
       },
+      cookieOptions: COOKIE_OPTIONS,
       cookies: {
         getAll() {
           return cookieStore.getAll();

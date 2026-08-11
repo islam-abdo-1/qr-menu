@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { hasValidSession } from "@/lib/session";
 
 /**
  * المسارات المحجوزة للنظام — تُستثنى من إعادة كتابة المستأجرين دائمًا.
@@ -48,6 +49,8 @@ function tenantRewrite(pathname: string): string | null {
  *  - كل استجابة جديدة (redirect/rewrite) ترث كوكيز supabaseResponse
  *    المجددة من getUser() — لا تُسقط الجلسة المنعشة أبدًا.
  *  - فحص الجلسة على /admin و /login فقط، حتى لا يلمس المنيو العام (ISR).
+ *  - تحقق محلي أولًا (فك JWT بلا شبكة): توكن غير منتهٍ → صفر طلبات خادم مصادقة
+ *    ولا سباق تدوير refresh token. getUser() فقط عند انتهاء التوكن (مرة بالساعة).
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -61,6 +64,12 @@ export async function updateSession(request: NextRequest) {
         autoRefreshToken: true,
         detectSessionInUrl: false,
         flowType: "pkce",
+      },
+      cookieOptions: {
+        maxAge: 60 * 60 * 24 * 30, // 30 يومًا — «تذكرني» بعد إغلاق المتصفح
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
       },
       cookies: {
         getAll() {
@@ -82,10 +91,15 @@ export async function updateSession(request: NextRequest) {
   const isLoginPath = pathname === "/login" || pathname.startsWith("/login");
 
   // لا نتحقق من الجلسة في الصفحات العامة إطلاقًا (سرعة + ثبات ISR)
-  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"] | null = null;
+  let hasSession = false;
   if (isAdminPath || isLoginPath) {
-    const { data } = await supabase.auth.getUser();
-    user = data.user;
+    // تحقق محلي أولًا (صفر شبكة): توكن غير منتهٍ = جلسة قائمة بلا أي طلب خادم مصادقة
+    hasSession = hasValidSession(request.cookies.getAll());
+    if (!hasSession) {
+      // توكن منتهٍ أو غائب — نجدد عبر getUser() (يكتب الكوكيز الجديدة في setAll)
+      const { data } = await supabase.auth.getUser();
+      hasSession = !!data.user;
+    }
   }
 
   /**
@@ -109,7 +123,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // 2) حماية لوحة الأدمن — بدون جلسة نعيد التوجيه لصفحة الدخول مع حفظ الوجهة
-  if (isAdminPath && !user) {
+  if (isAdminPath && !hasSession) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
@@ -117,7 +131,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // 3) مسجّل دخول يفتح /login → مباشرة إلى لوحة الإدارة (دون إسقاط الكوكيز)
-  if (isLoginPath && user) {
+  if (isLoginPath && hasSession) {
     return inheritCookies(NextResponse.redirect(new URL("/admin", request.url)));
   }
 

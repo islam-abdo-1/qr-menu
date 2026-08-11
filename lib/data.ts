@@ -3,6 +3,7 @@ import { unstable_cache as cache } from "next/cache";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { decodeJwtPayload, sessionCookieValue, tokenFromSessionCookie } from "@/lib/session";
 
 /** العلامة المستخدمة لكل تجديد بعد التعديل من لوحة الإدارة */
 export const MENU_TAG = "menu";
@@ -142,19 +143,6 @@ const cachedOwner = cache(
   { tags: [OWNER_TAG], revalidate: 20 },
 );
 
-/** فك حمولة JWT محليًا — بلا شبكة وبلا تحقق توقيع (الكوكي HttpOnly فلا يمكن تزويره) */
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  try {
-    const payload = Buffer.from(parts[1], "base64url").toString("utf8");
-    const json = JSON.parse(payload);
-    return typeof json === "object" && json !== null ? json : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * مستخدم Supabase من توكن الجلسة — مساران:
  *  1) توكن غير منتهٍ: فك محلي لمطالبة sub (صفر شبكة) — أسرع طريق لكل بولينج اللوحة.
@@ -175,25 +163,9 @@ async function resolveUserId(token: string): Promise<string | null> {
 }
 
 /** مطعم المالك الحالي من الجلسة — تُستخدم في لوحة الإدارة وكل إجراءات التعديل */
-/** استخراج توكن الوصول من كوكيز جلسة Supabase SSR:
- *  القيمة بصيغة base64-<json> (أو JWT خام في بعض الإعدادات) — لا تُمرَّر كما هي. */
-function tokenFromSessionCookie(value: string): string | null {
-  if (!value.startsWith("base64-")) return value || null;
-  try {
-    const b64 = value.slice(7).replace(/-/g, "+").replace(/_/g, "/");
-    const session = JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
-    return typeof session.access_token === "string" ? session.access_token : null;
-  } catch {
-    return null;
-  }
-}
-
-/** مطعم المالك الحالي من الجلسة — تُستخدم في لوحة الإدارة وكل إجراءات التعديل */
 export async function getOwnerRestaurant() {
-  const cookie = cookies()
-    .getAll()
-    .find((c) => c.name.endsWith("-auth-token"));
-  const token = cookie ? tokenFromSessionCookie(cookie.value) : null;
+  const value = sessionCookieValue(cookies().getAll());
+  const token = value ? tokenFromSessionCookie(value) : null;
   if (!token) return null;
   const userId = await resolveUserId(token);
   if (!userId) return null;
