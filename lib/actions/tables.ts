@@ -5,6 +5,7 @@ import { unstable_cache as cache } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOwnerRestaurant, MENU_TAG } from "@/lib/data";
+import { isOwnerBillingExpired } from "@/lib/billing";
 import { fail, ok, type ActionResult } from "@/lib/actions/helpers";
 
 export type TableView = { id: string; number: number; reserved: boolean };
@@ -29,6 +30,7 @@ export async function listTablesAction(): Promise<ActionResult<TableView[]>> {
   try {
     const restaurant = await getOwnerRestaurant();
     if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    if (await isOwnerBillingExpired(restaurant)) return fail("انتهت الفترة المجانية — جدّد اشتراكك");
     return ok(await loadTables(restaurant.id));
   } catch (e) {
     console.error("[tables] list failed:", e);
@@ -42,6 +44,7 @@ export async function addTableAction(number: number): Promise<ActionResult<Table
   try {
     const restaurant = await getOwnerRestaurant();
     if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    if (await isOwnerBillingExpired(restaurant)) return fail("انتهت الفترة المجانية — جدّد اشتراكك");
     const existing = await prisma.table.findUnique({
       where: { restaurantId_number: { restaurantId: restaurant.id, number: n } },
     });
@@ -65,6 +68,7 @@ export async function removeTableAction(id: string): Promise<ActionResult<TableV
   try {
     const restaurant = await getOwnerRestaurant();
     if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    if (await isOwnerBillingExpired(restaurant)) return fail("انتهت الفترة المجانية — جدّد اشتراكك");
     const table = await prisma.table.findUnique({ where: { id } });
     if (!table || table.restaurantId !== restaurant.id) return fail("الطاولة غير موجودة");
     await prisma.table.delete({ where: { id } });
@@ -81,6 +85,7 @@ export async function toggleTableReservedAction(id: string): Promise<ActionResul
   try {
     const restaurant = await getOwnerRestaurant();
     if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    if (await isOwnerBillingExpired(restaurant)) return fail("انتهت الفترة المجانية — جدّد اشتراكك");
     const table = await prisma.table.findUnique({ where: { id } });
     if (!table || table.restaurantId !== restaurant.id) return fail("الطاولة غير موجودة");
     await prisma.table.update({ where: { id }, data: { reserved: !table.reserved } });

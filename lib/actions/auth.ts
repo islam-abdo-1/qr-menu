@@ -75,7 +75,45 @@ export async function signOutAction(): Promise<ActionResult<null>> {
   }
 }
 
+/* ───────────────────────── استعادة كلمة المرور ───────────────────────── */
+
+/**
+ * إرسال رابط استعادة كلمة المرور إلى البريد.
+ * نُعيد رسالة عامة دائمًا (لا نكشف وجود الحساب) لمنع استكشاف المستخدمين.
+ */
+export async function requestPasswordResetAction(
+  email: string,
+): Promise<ActionResult<null>> {
+  const parsed = z.string().trim().toLowerCase().email("بريد إلكتروني غير صالح").safeParse(email);
+  if (!parsed.success) {
+    const { error } = fromZod(parsed.error);
+    return fail(error);
+  }
+
+  try {
+    const supabase = createClient();
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://site-menu.ddnsfree.com";
+    const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, {
+      redirectTo: `${siteUrl}/update-password`,
+    });
+    if (error) return fail(authErrorMessage(error.message));
+    return ok(null);
+  } catch {
+    return fail("تعذّر إرسال رسالة الاستعادة — حاول لاحقًا");
+  }
+}
+
 /* ───────────────────────── تسجيل مطعم جديد ───────────────────────── */
+
+/** إعدادات المنصة العامة (حد المطاعم + فتح/إغلاق التسجيل) — تُعدَّل من لوحة المالك */
+async function getSiteSettings() {
+  const rows = await prisma.siteSetting.findMany();
+  const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  return {
+    signupOpen: map.signupOpen !== "false",
+    maxRestaurants: Math.max(1, Number.parseInt(map.maxRestaurants ?? "25", 10) || 25),
+  };
+}
 
 /** مطعم المالك من الجلسة — تُستخدم في لوحة الإدارة وكل إجراءات التعديل */
 function createSupabaseAdmin() {
@@ -159,6 +197,18 @@ export async function registerRestaurantAction(
   }
 
   try {
+    // فرض إعدادات المنصة: التسجيل مغلق أو بلوغ الحد الأقصى للمطاعم
+    const settings = await getSiteSettings();
+    if (!settings.signupOpen) {
+      return fail("التسجيل مغلق حاليًا — تواصل مع الإدارة لفتح حسابك");
+    }
+    const count = await prisma.restaurant.count();
+    if (count >= settings.maxRestaurants) {
+      return fail(
+        `اكتمل عدد المطاعم المتاحة حاليًا (${settings.maxRestaurants}) — تواصل مع الإدارة لرفع الحد`,
+      );
+    }
+
     const supabase = createClient();
     const { data, error } = await supabase.auth.signUp({
       email: parsed.data.email,
@@ -171,12 +221,15 @@ export async function registerRestaurantAction(
     try {
       const slug = await uniqueSlug(parsed.data.restaurantName);
       const staffPin = await generateUniqueStaffPin();
+      // كل مطعم جديد يحصل على أسبوع مجاني كامل — بعده يتحول للاشتراك
+      const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       const restaurant = await prisma.restaurant.create({
         data: {
           slug,
           name: parsed.data.restaurantName,
           ownerId: user.id,
           staffPin,
+          trialEndsAt,
         },
       });
       await prisma.setting.create({

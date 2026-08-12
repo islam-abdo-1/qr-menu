@@ -8,6 +8,7 @@ import { fail, ok, type ActionResult } from "@/lib/actions/helpers";
 import { getOwnerRestaurant, OWNER_TAG } from "@/lib/data";
 import { generateUniqueStaffPin, isStaffPinTaken } from "@/lib/staff-pin";
 import { staffNameSchema } from "@/lib/validations";
+import { isOwnerBillingExpired } from "@/lib/billing";
 
 const staffInputSchema = z.object({
   enabled: z.boolean(),
@@ -31,6 +32,7 @@ export async function updateStaffSettingsAction(input: {
   try {
     const restaurant = await getOwnerRestaurant();
     if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    if (await isOwnerBillingExpired(restaurant)) return fail("انتهت الفترة المجانية — جدّد اشتراكك");
 
     let pin = "";
     if (parsed.data.enabled) {
@@ -70,6 +72,7 @@ export async function listStaffAction(): Promise<ActionResult<StaffView[]>> {
   try {
     const restaurant = await getOwnerRestaurant();
     if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    if (await isOwnerBillingExpired(restaurant)) return fail("انتهت الفترة المجانية — جدّد اشتراكك");
     const staff = await prisma.staff.findMany({
       where: { restaurantId: restaurant.id },
       orderBy: { createdAt: "asc" },
@@ -88,6 +91,7 @@ export async function addStaffAction(name: string): Promise<ActionResult<StaffVi
   try {
     const restaurant = await getOwnerRestaurant();
     if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    if (await isOwnerBillingExpired(restaurant)) return fail("انتهت الفترة المجانية — جدّد اشتراكك");
 
     const count = await prisma.staff.count({ where: { restaurantId: restaurant.id } });
     if (count >= 50) return fail("الحد الأقصى 50 موظفًا");
@@ -115,6 +119,7 @@ export async function removeStaffAction(id: string): Promise<ActionResult<StaffV
   try {
     const restaurant = await getOwnerRestaurant();
     if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    if (await isOwnerBillingExpired(restaurant)) return fail("انتهت الفترة المجانية — جدّد اشتراكك");
     const staff = await prisma.staff.findUnique({ where: { id } });
     if (!staff || staff.restaurantId !== restaurant.id) return fail("الموظف غير موجود");
     await prisma.staff.delete({ where: { id } });

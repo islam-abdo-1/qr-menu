@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ثبات عرض التخطيط: يحجز مكان شريط التمرير دائمًا فلا تقفز المحتويات (الشريط الجانبي) عند التنقل بين التبويبات */
+@layer base {
+  html {
+    scrollbar-gutter: stable;
+  }
+}
+
 @layer base {
   :root {
     /* ── Dark Luxe (Gold × Black) ─────────────── */

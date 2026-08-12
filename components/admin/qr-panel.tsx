@@ -92,12 +92,12 @@ export function QrPanel({
         </span>
       </div>
 
-      <div className="flex flex-col items-center gap-7 p-6 sm:p-8">
-        <div className="rounded-2xl p-3 shadow-elevated">
-          <div className="rounded-xl border-8 border-white bg-white">
-            <canvas ref={canvasRef} aria-label="QR code" className="h-60 w-60 sm:h-80 sm:w-80" />
+      <div className="flex flex-col items-center gap-6 p-5 sm:gap-7 sm:p-8">
+        <div className="rounded-2xl p-2 shadow-elevated sm:p-2.5">
+          <div className="rounded-xl border-4 border-white bg-white sm:border-8">
+            <canvas ref={canvasRef} aria-label="QR code" className="h-32 w-32 sm:h-40 sm:w-40 lg:h-48 lg:w-48" />
           </div>
-          <p className="mt-3 text-center font-display text-sm font-bold text-cream/80">{restaurantName}</p>
+          <p className="mt-2.5 text-center font-display text-sm font-bold text-cream/80">{restaurantName}</p>
         </div>
 
         <div className="w-full max-w-md space-y-3">

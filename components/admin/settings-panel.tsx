@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Image as ImageIcon, Loader2, Save, Store } from "lucide-react";
+import { Bike, Image as ImageIcon, Loader2, Save, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -15,6 +15,7 @@ import {
 import { ImageUploader } from "@/components/admin/image-uploader";
 import { PwaSettingsShare } from "@/components/pwa/settings-share";
 import { updateSettingsAction } from "@/lib/actions/settings";
+import { cn } from "@/lib/utils";
 import type { AdminSettings } from "./types";
 
 type Props = {
@@ -51,6 +52,7 @@ export function SettingsPanel({ settings, onSaved, dashboardUrl }: Props) {
   const [name, setName] = useState(settings.restaurantName);
   const [currency, setCurrency] = useState(settings.currency || "EGP");
   const [logoUrl, setLogoUrl] = useState<string | null>(settings.logoUrl || null);
+  const [deliveryEnabled, setDeliveryEnabled] = useState(settings.deliveryEnabled);
   const [saving, setSaving] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -60,6 +62,7 @@ export function SettingsPanel({ settings, onSaved, dashboardUrl }: Props) {
       restaurantName: name,
       currency,
       logoUrl,
+      deliveryEnabled,
     });
     setSaving(false);
     if (res.ok) {
@@ -124,6 +127,39 @@ export function SettingsPanel({ settings, onSaved, dashboardUrl }: Props) {
               </div>
             </div>
             <ImageUploader kind="logo" value={logoUrl} onChange={setLogoUrl} />
+          </div>
+
+          {/* طلبات التوصيل */}
+          <div className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-background p-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gold/15 text-gold">
+                <Bike className="h-4 w-4" />
+              </span>
+              <div>
+                <Label>طلبات التوصيل</Label>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                  عند التفعيل يستقبل موقعك طلبات التوصيل من الزبائن وتصل لشاشة الموظفين — عند
+                  التعطيل يختفي خيار التوصيل من المنيو فورًا
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={deliveryEnabled}
+              onClick={() => setDeliveryEnabled((v) => !v)}
+              className={cn(
+                "relative h-7 w-12 shrink-0 rounded-full transition-colors",
+                deliveryEnabled ? "bg-gold" : "bg-border",
+              )}
+            >
+              <span
+                className={cn(
+                  "absolute top-1 h-5 w-5 rounded-full bg-background shadow transition-all",
+                  deliveryEnabled ? "start-6" : "start-1",
+                )}
+              />
+            </button>
           </div>
 
           <Button type="submit" disabled={saving} className="h-11 rounded-xl px-6">

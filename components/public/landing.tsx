@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { BellRing, QrCode, Rocket, ScanLine, Sparkles, Store, UtensilsCrossed } from "lucide-react";
+import { BellRing, Bike, QrCode, Rocket, ScanLine, Sparkles, Store, UtensilsCrossed } from "lucide-react";
 
 const T = {
   badge: "منصّة المنيو الرقمي",
@@ -16,6 +16,7 @@ const T = {
     { icon: QrCode, title: "رمز QR للطاولات", desc: "رمز جاهز للطباعة — الزبون يمسح ويفتح القائمة فورًا من موبايله." },
     { icon: BellRing, title: "استقبال الطلبات", desc: "الطلب يوصل لقسم الموظفين لحظيًا مع تنبيه صوتي وحالات متابعة." },
     { icon: Store, title: "لوحة تحكم كاملة", desc: "أضف الأقسام والعناصر والصور والأسعار والمقاسات والخصومات، حدّد الطاولات والموظفين، تابع الطلبات لحظيًا وصدر سجل عملاء التوصيل — وكل تعديل يظهر فورًا لعملائك." },
+    { icon: Bike, title: "استقبال طلبات التوصيل", desc: "موقعك يستقبل طلبات التوصيل من زبائنك مباشرة — الاسم والهاتف والعنوان يصلون لشاشة الموظفين لحظيًا مع تنبيه صوتي، ويمكنك تفعيل أو تعطيل التوصيل من لوحة التحكم متى شئت." },
   ],
   footer: "قائمة رقمية — مسح ضوئي — طلب مباشر",
 };

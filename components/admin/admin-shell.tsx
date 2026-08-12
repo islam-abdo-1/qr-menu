@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import {
   BarChart3,
   ClipboardList,
+  CreditCard,
   ExternalLink,
   LayoutDashboard,
   LogOut,
@@ -31,9 +32,20 @@ import { OrdersPanel } from "@/components/admin/orders-panel";
 import { ReportsPanel } from "@/components/admin/reports-panel";
 import { TablesPanel } from "@/components/admin/tables-panel";
 import { StaffPanel } from "@/components/admin/staff-panel";
+import { BillingPanel } from "@/components/admin/billing-panel";
+import { TrialBanner } from "@/components/admin/trial-banner";
 import type { AdminData } from "@/components/admin/types";
 
-type Tab = "orders" | "items" | "categories" | "settings" | "qr" | "reports" | "tables" | "staff";
+type Tab =
+  | "orders"
+  | "items"
+  | "categories"
+  | "settings"
+  | "qr"
+  | "reports"
+  | "tables"
+  | "staff"
+  | "billing";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "orders", label: "الطلبات", icon: ClipboardList },
@@ -42,6 +54,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "categories", label: "الأقسام", icon: Tags },
   { id: "tables", label: "الطاولات", icon: Table2 },
   { id: "staff", label: "الموظفون", icon: Users },
+  { id: "billing", label: "الاشتراك", icon: CreditCard },
   { id: "settings", label: "الإعدادات", icon: Settings },
   { id: "qr", label: "رمز QR", icon: QrCode },
 ];
@@ -125,7 +138,7 @@ export function AdminShell({ data }: { data: AdminData }) {
   return (
     <div className="flex min-h-screen flex-col bg-background lg:flex-row">
       {/* ───── الشريط الجانبي ───── */}
-      <aside className="flex flex-col border-b border-gold/15 bg-[#171310] lg:min-h-screen lg:w-72 lg:border-b-0 lg:border-e">
+      <aside className="flex flex-col border-b border-gold/15 bg-[#171310] lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-e lg:min-w-72 lg:max-w-72">
         <div className="px-6 py-6">
           <div className="flex items-center gap-3">
             {data.settings.logoUrl ? (
@@ -184,27 +197,37 @@ export function AdminShell({ data }: { data: AdminData }) {
           })}
         </nav>
 
-        <div className="mt-auto flex flex-col gap-2 border-t border-gold/15 p-4">
-          <Button variant="outline" asChild className="justify-start rounded-xl">
-            <a href={menuPath} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="h-4 w-4 text-gold" />
-              معاينة المنيو العام
-            </a>
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={handleLogout}
-            className="justify-start rounded-xl text-destructive hover:bg-destructive/10"
-          >
-            <LogOut className="h-4 w-4" />
-            تسجيل الخروج
-          </Button>
+        {/* شريط سفلي موحّد على الموبايل: نصفان متساويان بفاصل ذهبي — عنصر واحد أنيق بدل زرين عائمين */}
+        <div className="mt-auto border-t border-gold/15 bg-[#171310] p-2.5 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40 max-lg:border-t-gold/20 max-lg:shadow-[0_-12px_40px_-12px_rgba(0,0,0,0.8)] lg:mt-auto lg:flex-col">
+          <div className="mx-auto flex w-full max-w-md items-center gap-2 rounded-2xl border border-gold/25 bg-[#201A14] p-1.5 shadow-inner lg:max-w-none lg:flex-col lg:gap-1 lg:rounded-xl lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
+            <Button variant="ghost" asChild className="flex-1 justify-center rounded-xl hover:bg-gold/10 lg:w-full lg:justify-start">
+              <a href={menuPath} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4 text-gold" />
+                <span className="max-lg:hidden">معاينة المنيو العام</span>
+                <span className="lg:hidden">المنيو العام</span>
+              </a>
+            </Button>
+            <span className="h-6 w-px shrink-0 bg-gold/20 lg:hidden" aria-hidden />
+            <Button
+              variant="ghost"
+              onClick={handleLogout}
+              className="flex-1 justify-center rounded-xl text-destructive hover:bg-destructive/10 lg:w-full lg:justify-start"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="max-lg:hidden">تسجيل الخروج</span>
+              <span className="lg:hidden">خروج</span>
+            </Button>
+          </div>
         </div>
       </aside>
 
       {/* ───── المحتوى ───── */}
-      <main className="min-w-0 flex-1 p-4 sm:p-8">
+      <main className="min-w-0 flex-1 p-4 pb-28 sm:p-8 sm:pb-8 lg:pb-8">
         <div className="mx-auto max-w-5xl">
+          {data.billingStatus === "trial" && (
+            <TrialBanner daysLeft={data.trialDaysLeft} onOpenBilling={() => setTab("billing")} />
+          )}
+
           {/* الترويسة + الإحصائيات */}
           <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -251,6 +274,7 @@ export function AdminShell({ data }: { data: AdminData }) {
               dashboardUrl={`${siteUrl}/admin`}
             />
           )}
+          {tab === "billing" && <BillingPanel data={data} />}
           {tab === "qr" && <QrPanel restaurantName={data.settings.restaurantName} menuUrl={menuUrl} />}
         </div>
       </main>

@@ -9,6 +9,7 @@ export type AdminItem = {
   description: string | null;
   price: number;
   discountPercentage: number | null;
+  sizeMode: "letters" | "weight";
   sizes: AdminItemSize[];
   imageUrl: string | null;
   isAvailable: boolean;
@@ -27,10 +28,22 @@ export type AdminSettings = {
   currency: string;
   themePrimary: string;
   logoUrl: string | null;
+  deliveryEnabled: boolean;
 };
 
 export type AdminData = {
-  restaurant: { id: string; slug: string; staffPin: string | null };
+  restaurant: {
+    id: string;
+    slug: string;
+    staffPin: string | null;
+    blocked: boolean;
+    trialEndsAt: Date | null;
+    paidUntil: Date | null;
+    billingExempt: boolean;
+  };
+  billingEnabled: boolean;
+  billingStatus: "exempt" | "active" | "trial" | "expired";
+  trialDaysLeft: number;
   settings: AdminSettings;
   categories: AdminCategory[];
 };

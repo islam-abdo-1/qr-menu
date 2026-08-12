@@ -49,6 +49,7 @@ export function StaffShell({ slug, logoUrl: initialLogoUrl = null }: { slug?: st
 
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
+  const [remember, setRemember] = useState(true);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginBusy, setLoginBusy] = useState(false);
 
@@ -106,7 +107,7 @@ export function StaffShell({ slug, logoUrl: initialLogoUrl = null }: { slug?: st
     e.preventDefault();
     setLoginError(null);
     setLoginBusy(true);
-    const res = await staffLoginAction(name, pin, slug);
+    const res = await staffLoginAction(name, pin, slug, remember);
     setLoginBusy(false);
     if (!res.ok) {
       setLoginError(res.error);
@@ -206,6 +207,16 @@ export function StaffShell({ slug, logoUrl: initialLogoUrl = null }: { slug?: st
                 {loginError}
               </p>
             )}
+
+            <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-cream/70">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="h-4 w-4 rounded border-gold/40 accent-[#C84C21]"
+              />
+              تذكرني — تبقى الجلسة مفتوحة 30 يومًا
+            </label>
 
             <button
               type="submit"

@@ -8,6 +8,7 @@ import { fromZod, fail, ok, type ActionResult } from "@/lib/actions/helpers";
 import { getOwnerRestaurant } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { imagePathFromUrl } from "@/lib/supabase/storage";
+import { isOwnerBillingExpired } from "@/lib/billing";
 
 const BUCKET = "menu-images";
 
@@ -22,6 +23,7 @@ export async function updateSettingsAction(
   try {
     const restaurant = await getOwnerRestaurant();
     if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    if (await isOwnerBillingExpired(restaurant)) return fail("انتهت الفترة المجانية — جدّد اشتراكك");
 
     const existing = await prisma.setting.findUnique({
       where: { restaurantId: restaurant.id },
@@ -43,6 +45,11 @@ export async function updateSettingsAction(
         data: { ...parsed.data, restaurantId: restaurant.id },
       });
     }
+    // مزامنة اسم المطعم في السجل الرسمي حتى لا يتباعد الاسم بين الشاشات
+    await prisma.restaurant.update({
+      where: { id: restaurant.id },
+      data: { name: parsed.data.restaurantName },
+    });
     revalidateTag("menu");
     return ok(null);
   } catch (e) {

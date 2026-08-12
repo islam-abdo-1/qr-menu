@@ -1,12 +1,22 @@
 import Link from "next/link";
 import { getAdminData } from "@/lib/data";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { SuspendedCard } from "@/components/admin/suspended-card";
+import { SubscribeCard } from "@/components/admin/subscribe-card";
 import { Store } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
   const data = await getAdminData();
+
+  if (data?.restaurant.blocked) {
+    return <SuspendedCard />;
+  }
+
+  if (data?.billingStatus === "expired") {
+    return <SubscribeCard />;
+  }
 
   if (!data) {
     return (

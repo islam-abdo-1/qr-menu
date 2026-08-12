@@ -6,9 +6,10 @@ import { ChevronDown, ScanLine, ShoppingBag, Sparkles, UtensilsCrossed } from "l
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
 import { applyDiscount } from "@/lib/utils";
-import type { MenuData } from "@/lib/data";
+import type { MenuCategory, MenuData } from "@/lib/data";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { ItemCard } from "@/components/public/item-card";
+import { ItemDetailDialog } from "@/components/public/item-detail-dialog";
 import { CartDrawer } from "@/components/public/cart-drawer";
 import { ShareMenu } from "@/components/public/share-menu";
 import { loadCart, saveCart, cartCount, cartTotal, cartKey, type CartItem } from "@/lib/cart";
@@ -42,6 +43,7 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
     data.settings?.restaurantName || (locale === "ar" ? "قائمة الطعام" : "Menu");
   const currency = data.settings?.currency ?? "EGP";
   const themePrimary = data.settings?.themePrimary || "#C84C21";
+  const deliveryEnabled = data.settings?.deliveryEnabled ?? true;
 
   /* ───── السلة ───── */
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -132,6 +134,16 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const categoryKey = categories.map((c) => c.id).join("|");
   const logoUrl = data.settings?.logoUrl ?? null;
+
+  /* ───── نافذة تفاصيل المنتج ───── */
+  const [detailItem, setDetailItem] = useState<MenuCategory["items"][number] | null>(null);
+  // لو اختفى الصنف (تعديل متزامن) نغلق النافذة تلقائيًا
+  useEffect(() => {
+    if (detailItem && !categories.some((c) => c.items.some((i) => i.id === detailItem.id))) {
+      setDetailItem(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryKey]);
 
   useEffect(() => {
     if (categories.length === 0) return;
@@ -337,7 +349,7 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
                   <Ornament className="mt-4 text-gold" />
                 </motion.div>
 
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
                   {category.items.map((item, itemIndex) => (
                     <ItemCard
                       key={item.id}
@@ -350,6 +362,7 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
                       logoUrl={logoUrl}
                       qtyInCart={cartQtyOf(item.id)}
                       bestSeller={bestSellers.includes(item.id)}
+                      onOpenDetails={() => setDetailItem(item)}
                       onAdd={(sel) =>
                         addToCart(
                           { id: item.id, name: item.name, price: item.price, imageUrl: item.imageUrl },
@@ -368,6 +381,29 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
         </>
       )}
 
+      {/* ───── نافذة تفاصيل المنتج ───── */}
+      <ItemDetailDialog
+        key={detailItem?.id ?? "closed"}
+        item={detailItem}
+        currency={currency}
+        locale={locale}
+        themePrimary={themePrimary}
+        logoUrl={logoUrl}
+        qtyInCart={detailItem ? cartQtyOf(detailItem.id) : 0}
+        onAdd={(sel) =>
+          detailItem
+            ? addToCart(
+                { id: detailItem.id, name: detailItem.name, price: detailItem.price, imageUrl: detailItem.imageUrl },
+                {
+                  sizeCode: sel?.sizeCode,
+                  price: sel?.price ?? applyDiscount(detailItem.price, detailItem.discountPercentage),
+                },
+              )
+            : undefined
+        }
+        onClose={() => setDetailItem(null)}
+      />
+
       {/* ───── درج السلة ───── */}
       <CartDrawer
         open={cartOpen}
@@ -377,6 +413,7 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
         currency={currency}
         tables={data.tables}
         items={cart}
+        deliveryEnabled={deliveryEnabled}
         onUpdateQty={updateQty}
         onRemove={removeFromCart}
         onOrderPlaced={handleOrderPlaced}
@@ -392,7 +429,7 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
           <button
             type="button"
             onClick={() => setCartOpen(true)}
-            className="mx-auto flex w-full max-w-md items-center justify-between gap-3 rounded-2xl border border-gold/40 bg-[#191310]/95 px-5 py-3.5 shadow-[0_20px_60px_-12px_rgba(0,0,0,0.8)] backdrop-blur-xl transition-transform active:scale-[0.98]"
+            className="mx-auto flex w-full max-w-md items-center justify-between gap-3 rounded-2xl border border-gold/40 bg-[#191310]/95 px-5 py-3.5 shadow-[0_20px_60px_-12px_rgba(0,0,0,0.8)] transition-transform active:scale-[0.98]"
           >
             <span className="flex items-center gap-2.5">
               <span className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-gold to-[#a87a2b] text-background">

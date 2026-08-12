@@ -20,6 +20,10 @@ model Restaurant {
   staffPin  String     @default("") // كود دخول الموظفين
   pinFailedAttempts Int @default(0) // محاولات الكود الخاطئة (قفل ضد التخمين)
   pinLockedUntil    DateTime? // مدة القفل بعد تكرار المحاولات الخاطئة
+  blocked   Boolean    @default(false) // حظر مؤقت من لوحة المالك — يوقف لوحة الأدمن والموظفين (المنيو العام يعمل)
+  trialEndsAt   DateTime? // نهاية الأسبوع المجاني — بعده يلزم الاشتراك (الفترة المجانية لأول 7 أيام)
+  paidUntil     DateTime? // نهاية الاشتراك المدفوع الحالي — مستوفى الاشتراك ما دام في المستقبل
+  billingExempt Boolean   @default(false) // مستثنى نهائيًا من الفوترة — لا يُحظر ولا يُحذف ولا يلزمه دفع
   createdAt DateTime   @default(now())
   settings  Setting?
   categories Category[]
@@ -28,17 +32,63 @@ model Restaurant {
   tables     Table[]
   dayStats   DayStat[]
   staff      Staff[]
+  payments  Payment[]
+}
+
+/// إعداد عام للمنصة (key/value) — يُعدَّل من تطبيق لوحة المالك بلا إعادة نشر
+model SiteSetting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String @default("")
+}
+
+/// دفعة اشتراك — تُنشأ عند دفع خطة شهرية/سنوية (بوابة Paymob عند تفعيلها)
+model Payment {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  amount       Float
+  plan         String     @default("monthly") // monthly | annual
+  method       String     @default("manual") // fawry | vodafone-cash | card | manual
+  paymobRef    String?    @unique // مرجع العملية من بوابة الدفع
+  status       String     @default("paid") // pending | paid | failed
+  createdAt    DateTime   @default(now())
+
+  @@index([restaurantId, createdAt(sort: Desc)])
+}
+
+/// سجل إجراءات المالك — أرشيف من فعل ماذا ومتى (حظر/حذف/تعديل)
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorEmail String
+  action     String
+  targetType String
+  targetName String
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+}
+
+/// محاولات دخول لوحة المالك — أساس قفل التخمين (5 فاشلة خلال 15 دقيقة = قفل)
+model OwnerLoginAttempt {
+  id        String   @id @default(cuid())
+  email     String
+  success   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt(sort: Desc)])
 }
 
 model Setting {
-  id             Int        @id @default(autoincrement())
-  restaurantId   String     @unique
-  restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  restaurantName String     @default("مطعمي")
-  currency       String     @default("EGP")
-  themePrimary   String     @default("#C84C21")
-  logoUrl        String?    @default("")
-  createdAt      DateTime   @default(now())
+  id               Int        @id @default(autoincrement())
+  restaurantId     String     @unique
+  restaurant       Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  restaurantName   String     @default("مطعمي")
+  currency         String     @default("EGP")
+  themePrimary     String     @default("#C84C21")
+  logoUrl          String?    @default("")
+  deliveryEnabled  Boolean    @default(true) // تفعيل/تعطيل استقبال طلبات التوصيل من المنيو
+  createdAt        DateTime   @default(now())
 }
 
 model Category {
@@ -63,6 +113,7 @@ model MenuItem {
   discountPercentage Int? // 0-100 — null/0 = لا خصم
   imageUrl           String?
   isAvailable        Boolean           @default(true)
+  sizeMode           String            @default("letters") // letters (S/M/L) أو weight (ربع/نص/كيلو + مخصص) — وضع واحد فقط لكل صنف
   categoryId         String
   category           Category          @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   createdAt          DateTime          @default(now())
@@ -73,10 +124,10 @@ model MenuItem {
   @@index([categoryId])
 }
 
-/// مقاس محدد لصنف (S/M/L/XL) بسعر خاص به — يُستخدم عند الطلب
+/// مقاس محدد لصنف (حرفي S/M/L أو وزني مثل «ربع كيلو»/«كيلو ونص») بسعر خاص به — يُستخدم عند الطلب
 model MenuItemSize {
   id         String   @id @default(uuid())
-  sizeCode   String // S | M | L | XL
+  sizeCode   String // S | M | L | ربع كيلو | نص كيلو | كيلو | وزن مخصص
   price      Float
   menuItemId String
   menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)

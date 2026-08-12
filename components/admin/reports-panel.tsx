@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BarChart3, Bike, Loader2, ReceiptText, Store, TrendingUp, Trophy, Wallet } from "lucide-react";
+import { BarChart3, Bike, Download, Loader2, ReceiptText, Store, TrendingUp, Trophy, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
 import {
@@ -15,6 +15,36 @@ const PERIODS: { id: ReportPeriod; label: string }[] = [
   { id: "7d", label: "آخر 7 أيام" },
   { id: "30d", label: "آخر 30 يوم" },
 ];
+
+/** بناء ملف CSV جاهز لـ Excel من التقرير — يتم في المتصفح بلا أي حمل على الخادم */
+function downloadCsv(report: SalesReport, periodLabel: string) {
+  const rows: (string | number)[][] = [
+    ["التقرير", periodLabel, formatPrice(report.totals.revenue, "EGP", "ar")],
+    ["إجمالي المبيعات", report.totals.revenue, ""],
+    ["عدد الطلبات", report.totals.orders, ""],
+    ["متوسط الطلب", report.totals.avg, ""],
+    ["داخل المطعم", report.totals.dineIn, ""],
+    ["توصيل", report.totals.delivery, ""],
+    [],
+    ["اليوم", "الإيراد", "الطلبات"],
+    ...report.byDay.map((d) => [d.label, d.revenue, d.orders] as (string | number)[]),
+    [],
+    ["الصنف", "الكمية", "الإيراد"],
+    ...report.bestSellers.map((b) => [b.name, b.qty, b.revenue] as (string | number)[]),
+  ];
+  const csv =
+    "\uFEFF" +
+    rows
+      .map((row) => row.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `تقرير-${periodLabel}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export function ReportsPanel() {
   const [period, setPeriod] = useState<ReportPeriod>("today");
@@ -61,23 +91,34 @@ export function ReportsPanel() {
 
   return (
     <div className="space-y-5">
-      {/* اختيار الفترة */}
-      <div className="flex w-fit gap-1 rounded-2xl border border-border bg-card p-1 shadow-soft">
-        {PERIODS.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => setPeriod(p.id)}
-            className={cn(
-              "rounded-xl px-4 py-2 text-sm font-bold transition-all",
-              period === p.id
-                ? "bg-gradient-to-l from-gold to-[#a87a2b] text-background shadow"
-                : "text-cream/70 hover:text-cream",
-            )}
-          >
-            {p.label}
-          </button>
-        ))}
+      {/* اختيار الفترة + تنزيل */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex w-fit gap-1 rounded-2xl border border-border bg-card p-1 shadow-soft">
+          {PERIODS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setPeriod(p.id)}
+              className={cn(
+                "rounded-xl px-4 py-2 text-sm font-bold transition-all",
+                period === p.id
+                  ? "bg-gradient-to-l from-gold to-[#a87a2b] text-background shadow"
+                  : "text-cream/70 hover:text-cream",
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => downloadCsv(report, PERIODS.find((p) => p.id === report.period)?.label ?? "تقرير")}
+          className="flex items-center gap-2 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-2 text-sm font-black text-gold transition-all hover:bg-gold/20 active:scale-95"
+        >
+          <Download className="h-4 w-4" />
+          تنزيل CSV
+        </button>
       </div>
 
       {/* بطاقات الإجماليات */}

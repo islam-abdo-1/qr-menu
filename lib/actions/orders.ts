@@ -8,6 +8,7 @@ import { getOwnerRestaurant } from "@/lib/data";
 import { applyDiscount } from "@/lib/utils";
 import { isValidPhone } from "@/lib/utils";
 import { getStaffSession, setStaffSession, clearStaffSession } from "@/lib/staff-session";
+import { getBillingEnabled, getBillingInfo, isBillingExpired } from "@/lib/billing";
 
 export type OrderStatus = "new" | "preparing" | "done";
 
@@ -157,7 +158,10 @@ export async function createOrderAction(
     // استعلامات متوازية (بلا تسلسل) — الأسعار من قاعدة البيانات فقط
     const itemIds = parsed.data.items.map((i) => i.itemId);
     const [restaurant, dbItems, tables, numberRow] = await Promise.all([
-      prisma.restaurant.findUnique({ where: { slug: parsed.data.restaurantSlug } }),
+      prisma.restaurant.findUnique({
+        where: { slug: parsed.data.restaurantSlug },
+        include: { settings: true },
+      }),
       prisma.menuItem.findMany({
         where: { id: { in: itemIds }, restaurant: { slug: parsed.data.restaurantSlug }, isAvailable: true },
         select: {
@@ -177,6 +181,14 @@ export async function createOrderAction(
       `,
     ]);
     if (!restaurant) return fail("المطعم غير موجود");
+
+    // التوصيل معطّل من لوحة التحكم — ارفض أي طلب توصيل مهما كانت محاولة التلاعب
+    if (
+      parsed.data.type === "delivery" &&
+      restaurant.settings?.deliveryEnabled === false
+    ) {
+      return fail("التوصيل غير متاح حاليًا — يمكنك الطلب في المطعم أو انتظار تفعيله");
+    }
 
     // الطاولة يجب أن تكون مضافة من لوحة الإدارة وغير محجوزة
     if (parsed.data.type === "dine-in") {
@@ -280,6 +292,10 @@ export async function getOrdersAction(): Promise<ActionResult<OrderView[]>> {
   try {
     const restaurant = await getOwnerRestaurant();
     if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    const billingEnabled = await getBillingEnabled();
+    if (isBillingExpired(getBillingInfo(restaurant, billingEnabled))) {
+      return fail("انتهت الفترة المجانية — جدّد اشتراكك");
+    }
     return ok(await loadOrders(restaurant.id));
   } catch (e) {
     console.error("[orders] admin list failed:", e);
@@ -295,6 +311,10 @@ export async function updateOrderStatusAction(
   try {
     const restaurant = await getOwnerRestaurant();
     if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    const billingEnabled = await getBillingEnabled();
+    if (isBillingExpired(getBillingInfo(restaurant, billingEnabled))) {
+      return fail("انتهت الفترة المجانية — جدّد اشتراكك");
+    }
 
     // تحديث واحد بشرط الملكية — يتحقق من وجود الطلب وانتمائه للمطعم معًا
     const res = await prisma.order.updateMany({
@@ -321,6 +341,7 @@ export async function staffLoginAction(
   name: string,
   pin: string,
   slug?: string,
+  remember?: boolean,
 ): Promise<
   ActionResult<{ restaurantName: string; slug: string; name: string }>
 > {
@@ -334,6 +355,11 @@ export async function staffLoginAction(
       ? await prisma.restaurant.findUnique({ where: { slug } })
       : await prisma.restaurant.findFirst({ where: { staffPin: parsed.data.pin } });
     if (!restaurant || !restaurant.staffPin) return fail("المطعم غير موجود أو الكود غير مفعّل");
+    if (restaurant.blocked) return fail("المطعم موقوف مؤقتًا — تواصل مع الإدارة");
+    const billingEnabled = await getBillingEnabled();
+    if (isBillingExpired(getBillingInfo(restaurant, billingEnabled))) {
+      return fail("انتهت الفترة المجانية — جدّد اشتراكك من لوحة الإدارة");
+    }
 
     // الاسم يجب أن يكون مسجّلًا ضمن موظفي هذا المطعم + إعدادات العرض الحية (الاسم مُحرَّر من اللوحة)
     const [staff, setting] = await Promise.all([
@@ -377,7 +403,7 @@ export async function staffLoginAction(
         data: { pinFailedAttempts: 0, pinLockedUntil: null },
       });
     }
-    await setStaffSession({ slug: restaurant.slug, name: parsed.data.name });
+    await setStaffSession({ slug: restaurant.slug, name: parsed.data.name }, remember);
     return ok({
       restaurantName: setting?.restaurantName || restaurant.name,
       slug: restaurant.slug,

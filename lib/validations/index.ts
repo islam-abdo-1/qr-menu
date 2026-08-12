@@ -21,7 +21,8 @@ export const menuItemSchema = z.object({
   price: z.coerce
     .number()
     .positive("السعر يجب أن يكون أكبر من صفر")
-    .max(1_000_000, "السعر كبير جدًا"),
+    .max(1_000_000, "السعر كبير جدًا")
+    .optional(),
   categoryId: z.string().min(1, "اختر قسمًا"),
   imageUrl: z.string().trim().max(500).optional().nullable(),
   isAvailable: z.boolean().optional(),
@@ -33,19 +34,30 @@ export const menuItemSchema = z.object({
     .max(100, "النسبة يجب أن تكون بين 0 و 100")
     .optional()
     .nullable(),
-  // مقاسات مفعلة بسعرها الخاص — حتى 4 مقاسات (S/M/L/XL)
+  // وضع المقاسات: أحرف (S/M/L) أو وزن (ربع/نص/كيلو + مخصص) — وضع واحد لكل صنف
+  sizeMode: z.enum(["letters", "weight"]).default("letters"),
+  // مقاسات مفعلة بسعرها الخاص — حتى 8 مقاسات (أحرف أو أوزان مخصصة)
   sizes: z
     .array(
       z.object({
-        sizeCode: z.enum(["S", "M", "L", "XL"]),
+        sizeCode: z.string().trim().min(1, "اسم المقاس مطلوب").max(12, "اسم المقاس طويل جدًا"),
         price: z.coerce
           .number()
           .positive("سعر المقاس يجب أن يكون أكبر من صفر")
           .max(1_000_000, "سعر المقاس كبير جدًا"),
       }),
     )
-    .max(4, "4 مقاسات كحد أقصى")
+    .max(8, "8 مقاسات كحد أقصى")
     .optional(),
+}).superRefine((data, ctx) => {
+  // السعر العادي إلزامي فقط عندما لا توجد مقاسات — مع المقاسات يُحسب من أقل سعر
+  if ((!data.sizes || data.sizes.length === 0) && data.price === undefined) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["price"],
+      message: "اكتب سعر العنصر",
+    });
+  }
 });
 
 export const settingsSchema = z.object({
@@ -57,6 +69,7 @@ export const settingsSchema = z.object({
     .regex(/^#[0-9a-fA-F]{6}$/, "لون غير صالح (مثال: #C84C21)")
     .optional(),
   logoUrl: z.string().trim().max(500).optional().nullable(),
+  deliveryEnabled: z.boolean().optional(),
 });
 
 export const credentialsSchema = z.object({

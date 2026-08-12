@@ -10,6 +10,8 @@ const RESERVED = new Set([
   "admin",
   "login",
   "signup",
+  "forgot-password",
+  "update-password",
   "staff",
   "m",
   "api",

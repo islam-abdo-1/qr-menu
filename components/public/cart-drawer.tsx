@@ -19,6 +19,7 @@ type Props = {
   currency: string;
   tables: MenuTable[];
   items: CartItem[];
+  deliveryEnabled?: boolean;
   onUpdateQty: (itemId: string, sizeCode: string | null | undefined, qty: number) => void;
   onRemove: (itemId: string, sizeCode: string | null | undefined) => void;
   onOrderPlaced: () => void;
@@ -36,6 +37,7 @@ export function CartDrawer({
   currency,
   tables,
   items,
+  deliveryEnabled = true,
   onUpdateQty,
   onRemove,
   onOrderPlaced,
@@ -64,6 +66,11 @@ export function CartDrawer({
       if (tables.some((tb) => tb.number === n)) setTableNo(t);
     }
   }, [open, tableNo, tables]);
+
+  // عند تعطيل التوصيل من لوحة التحكم نعود فورًا لوضع «في المطعم»
+  useEffect(() => {
+    if (!deliveryEnabled && type === "delivery") setType("dine-in");
+  }, [deliveryEnabled, type]);
 
   const reset = () => {
     setStep("cart");
@@ -126,15 +133,16 @@ export function CartDrawer({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
             onClick={() => handleOpenChange(false)}
-            className="absolute inset-0 h-full w-full cursor-default bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 h-full w-full cursor-default bg-black/70"
           />
           <motion.aside
             initial={{ x: locale === "ar" ? "-100%" : "100%" }}
             animate={{ x: 0 }}
             exit={{ x: locale === "ar" ? "-100%" : "100%" }}
-            transition={{ type: "tween", duration: 0.28, ease: "easeOut" }}
-            className="absolute inset-y-0 end-0 flex w-full max-w-md flex-col border-s border-gold/20 bg-[#171310] shadow-2xl"
+            transition={{ type: "tween", duration: 0.2, ease: "easeOut" }}
+            className="absolute inset-y-0 end-0 flex w-full max-w-md flex-col border-s border-gold/20 bg-[#171310] shadow-2xl will-change-transform"
           >
             {/* الترويسة */}
             <div className="flex items-center justify-between border-b border-gold/15 px-5 py-4">
@@ -265,7 +273,9 @@ export function CartDrawer({
                       { id: "dine-in", label: t(locale, "في المطعم", "Dine in") },
                       { id: "delivery", label: t(locale, "توصيل", "Delivery") },
                     ] as const
-                  ).map((o) => (
+                  )
+                    .filter((o) => o.id !== "delivery" || deliveryEnabled)
+                    .map((o) => (
                     <button
                       key={o.id}
                       type="button"

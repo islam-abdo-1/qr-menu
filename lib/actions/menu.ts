@@ -7,6 +7,7 @@ import { fromZod, fail, ok, type ActionResult } from "@/lib/actions/helpers";
 import { getOwnerRestaurant } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { imagePathFromUrl } from "@/lib/supabase/storage";
+import { getBillingEnabled, getBillingInfo, isBillingExpired } from "@/lib/billing";
 
 const TAG = "menu";
 const BUCKET = "menu-images";
@@ -20,10 +21,12 @@ function diskError(e: unknown) {
   return fail("حدث خطأ غير متوقع أثناء حفظ البيانات");
 }
 
-/** مطعم المالك من الجلسة — بدون مطعم لا توجد أي عملية تعديل */
+/** مطعم المالك من الجلسة — بدون مطعم (أو محظور/منتهي الاشتراك) لا توجد أي عملية تعديل */
 async function requireOwnerRestaurant() {
   const restaurant = await getOwnerRestaurant();
-  if (!restaurant) return null;
+  if (!restaurant || restaurant.blocked) return null;
+  const billingEnabled = await getBillingEnabled();
+  if (isBillingExpired(getBillingInfo(restaurant, billingEnabled))) return null;
   return restaurant;
 }
 
@@ -139,18 +142,27 @@ export async function reorderCategoriesAction(ids: string[]): Promise<ActionResu
 export type MenuItemInput = {
   name: string;
   description?: string;
-  price: number | string;
+  price?: number | string;
   categoryId: string;
   imageUrl?: string | null;
   isAvailable?: boolean;
+  sizeMode?: "letters" | "weight";
   discountPercentage?: number | null;
   sizes?: { sizeCode: string; price: number | string }[];
 };
 
+/** عند وجود مقاسات: السعر العادي يُحسب من أقل مقاس — نُلغيه من المدخلات ولا نطلبه */
+function normalizeBasePrice(input: MenuItemInput): MenuItemInput {
+  const hasSizes = (input.sizes?.length ?? 0) > 0;
+  return hasSizes ? { ...input, price: undefined } : input;
+}
+
 export async function createMenuItemAction(
   input: MenuItemInput,
 ): Promise<ActionResult<{ id: string }>> {
-  const parsed = menuItemSchema.safeParse(input);
+  // مع وجود مقاسات يصبح السعر العادي محسوبًا تلقائيًا من أقل مقاس — لا يُطلب من المستخدم
+  const normalized = normalizeBasePrice(input);
+  const parsed = menuItemSchema.safeParse(normalized);
   if (!parsed.success) {
     const { error, fieldErrors } = fromZod(parsed.error);
     return fail(error, fieldErrors);
@@ -166,11 +178,12 @@ export async function createMenuItemAction(
       data: {
         name: parsed.data.name,
         description: parsed.data.description,
-        price: parsed.data.price,
+        price: parsed.data.price ?? Math.min(...(parsed.data.sizes ?? []).map((s) => Number(s.price))),
         categoryId: parsed.data.categoryId,
         restaurantId: restaurant.id,
         imageUrl: parsed.data.imageUrl || null,
         isAvailable: parsed.data.isAvailable ?? true,
+        sizeMode: parsed.data.sizeMode ?? "letters",
         discountPercentage: parsed.data.discountPercentage || null,
         sizes: parsed.data.sizes?.length
           ? { create: parsed.data.sizes.map((s) => ({ sizeCode: s.sizeCode, price: s.price })) }
@@ -188,7 +201,8 @@ export async function updateMenuItemAction(
   id: string,
   input: MenuItemInput,
 ): Promise<ActionResult<null>> {
-  const parsed = menuItemSchema.safeParse(input);
+  const normalized = normalizeBasePrice(input);
+  const parsed = menuItemSchema.safeParse(normalized);
   if (!parsed.success) {
     const { error, fieldErrors } = fromZod(parsed.error);
     return fail(error, fieldErrors);
@@ -213,10 +227,11 @@ export async function updateMenuItemAction(
       data: {
         name: parsed.data.name,
         description: parsed.data.description,
-        price: parsed.data.price,
+        price: parsed.data.price ?? Math.min(...(parsed.data.sizes ?? []).map((s) => Number(s.price))),
         categoryId: parsed.data.categoryId,
         imageUrl: parsed.data.imageUrl || null,
         isAvailable: parsed.data.isAvailable ?? existing.isAvailable,
+        sizeMode: parsed.data.sizeMode ?? existing.sizeMode,
         discountPercentage: parsed.data.discountPercentage || null,
         // استبدال كامل للمقاسات: حذف القديمة وإنشاء الجديدة — تبقى فقط ما اختاره الأدمن
         sizes: {

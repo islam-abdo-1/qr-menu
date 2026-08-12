@@ -4,6 +4,7 @@ import { unstable_cache as cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getOwnerRestaurant } from "@/lib/data";
 import { fail, ok, type ActionResult } from "@/lib/actions/helpers";
+import { isOwnerBillingExpired } from "@/lib/billing";
 
 const ORDER_TAG = "orders";
 
@@ -121,6 +122,7 @@ export async function getSalesReportAction(
   try {
     const restaurant = await getOwnerRestaurant();
     if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    if (await isOwnerBillingExpired(restaurant)) return fail("انتهت الفترة المجانية — جدّد اشتراكك");
 
     const report = await loadReport(restaurant.id, period);
     return ok(report);
@@ -169,6 +171,7 @@ export async function getVisitsAction(): Promise<ActionResult<VisitsStats>> {
   try {
     const restaurant = await getOwnerRestaurant();
     if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    if (await isOwnerBillingExpired(restaurant)) return fail("انتهت الفترة المجانية — جدّد اشتراكك");
     return ok(await loadVisits(restaurant.id));
   } catch (e) {
     console.error("[visits] load failed:", e);

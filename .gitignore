@@ -47,3 +47,6 @@ reffter-js.js
 # next-pwa generated artifacts (regenerated on every build)
 /public/sw.js
 /public/workbox-*.js
+
+# نسخ احتياطية تلقائية — قد تحوي بيانات عملاء حساسة (لا تُرفع أبدًا)
+/backup/
