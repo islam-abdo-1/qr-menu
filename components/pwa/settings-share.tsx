@@ -50,7 +50,7 @@ export function PwaSettingsShare({ dashboardUrl }: Props) {
   const deferredRef = useRef<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
-    QRCode.toDataURL(dashboardUrl, { width: 168, margin: 1, errorCorrectionLevel: "M" })
+    QRCode.toDataURL(dashboardUrl, { width: 256, margin: 1, errorCorrectionLevel: "M" })
       .then(setQrDataUrl)
       .catch(() => setQrDataUrl(null));
   }, [dashboardUrl]);
@@ -195,12 +195,12 @@ export function PwaSettingsShare({ dashboardUrl }: Props) {
             <img
               src={qrDataUrl}
               alt="QR code — فتح لوحة الإدارة"
-              width={168}
-              height={168}
-              className="rounded-xl border border-border bg-white p-2"
+              width={256}
+              height={256}
+              className="mx-auto h-28 w-28 rounded-xl border border-border bg-white p-1.5 sm:mx-0 sm:h-36 sm:w-36"
             />
           ) : (
-            <div className="h-[168px] w-[168px] animate-pulse rounded-xl border border-dashed border-border bg-muted/40" />
+            <div className="mx-auto h-28 w-28 animate-pulse rounded-xl border border-dashed border-border bg-muted/40 sm:mx-0 sm:h-36 sm:w-36" />
           )}
           <p className="mt-1 text-center text-[10px] text-muted-foreground">
             امسح الرمز لفتح اللوحة

@@ -3,7 +3,6 @@ import { createHmac, createPublicKey, timingSafeEqual, verify as cryptoVerify } 
 import { unstable_cache as cache } from "next/cache";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/supabase/server";
 import { decodeJwtPayload, sessionCookieValue, tokenFromSessionCookie } from "@/lib/session";
 import { getBillingEnabled, getBillingInfo, trialDaysLeft } from "@/lib/billing";
 
@@ -223,12 +222,12 @@ const cachedOwner = cache(
 );
 
 /**
- * مستخدم Supabase من توكن الجلسة — مساران:
- *  1) توكن غير منتهٍ + توقيع موثّق (HMAC عبر SUPABASE_JWT_SECRET): فك محلي لمطالبة sub (صفر شبكة).
- *  2) خلاف ذلك: عميل SSR رسمي getUser() — يجدد التوكن عبر refresh token
- *     ويكتب الكوكيز الجديدة، فلا تُفقد الجلسة عند انتهاء ساعة التوكن أبدًا.
- * ملاحظة أمنية: بدون SUPABASE_JWT_SECRET يُغلق المسار السريع تلقائيًا
- * (دائمًا عبر getUser() الموثوق) — لا نثق أبدًا في sub بلا توقيع.
+ * مستخدم Supabase من توكن الجلسة — تحقق محلي فقط (فك JWT + تحقق توقيع + انتهاء):
+ * صفر شبكة على المسار السريع، وصفر استدعاءات getUser() إطلاقًا.
+ * تجديد الجلسة (refresh) مسؤولية الـ middleware وحدها — أي استدعاء getUser() آخر
+ * في نفس لحظة انتهاء التوكن كان يسبب سباق تدوير refresh token → كسر الجلسة
+ * → «طلب تسجيل الدخول» المتكرر. عند انتهاء التوكن نعيد null بهدوء
+ * (الإجراءات تتوقف، والـ layout/الـ middleware يعيدان التوجيه أو التجديد).
  */
 async function resolveUserId(token: string): Promise<string | null> {
   const payload = decodeJwtPayload(token);
@@ -237,12 +236,7 @@ async function resolveUserId(token: string): Promise<string | null> {
   if (exp && exp > Date.now() && typeof sub === "string" && sub && verifyJwtSignature(token)) {
     return sub;
   }
-  try {
-    const { user } = await getCurrentUser();
-    return user?.id ?? null;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 /** مطعم المالك الحالي من الجلسة — تُستخدم في لوحة الإدارة وكل إجراءات التعديل */

@@ -55,7 +55,13 @@ function tenantRewrite(pathname: string): string | null {
  *    ولا سباق تدوير refresh token. getUser() فقط عند انتهاء التوكن (مرة بالساعة).
  */
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+  /**
+   * النمط الرسمي لتحديث الجلسة: نكتب الكوكيز المنعشة على كائن الطلب أولًا،
+   * ثم نبني الاستجابة من الطلب المعدَّل — هكذا تصل الكوكيز الجديدة
+   * إلى Server Components (الـ layout) في نفس الطلب، فلا يرى layout
+   * توكنًا منتهيًا بعد أن جدّد الـ middleware الجلسة (سبب «طلب تسجيل الدخول» المتكرر).
+   */
+  const createSupabaseResponse = () => NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -77,16 +83,23 @@ export async function updateSession(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
-          // تحديث الجلسة (rotate): نكتب الكوكيز على الاستجابة الفعلية
+        setAll(cookiesToSet, cacheHeaders) {
+          // أولًا: تعميم الكوكيز المحدّثة على الطلب (تصل للـ layout في نفس الطلب)
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          // ثانيًا: بناء الاستجابة من الطلب المعدَّل + ترويسات منع تخزين الجلسات
+          supabaseResponse = createSupabaseResponse();
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options),
+          );
+          Object.entries(cacheHeaders).forEach(([key, value]) =>
+            supabaseResponse.headers.set(key, value),
           );
         },
       },
     },
   );
+
+  let supabaseResponse = createSupabaseResponse();
 
   const pathname = request.nextUrl.pathname;
   const isAdminPath = pathname.startsWith("/admin");

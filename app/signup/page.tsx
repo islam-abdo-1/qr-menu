@@ -9,10 +9,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function SignupPage() {
-  const [rows, count] = await Promise.all([
-    prisma.siteSetting.findMany(),
-    prisma.restaurant.count(),
-  ]);
+  const rows = await prisma.siteSetting.findMany();
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
 
   return (
@@ -23,11 +20,7 @@ export default async function SignupPage() {
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" aria-hidden />
 
       <div className="relative w-full max-w-md">
-        <SignupForm
-          signupOpen={map.signupOpen !== "false"}
-          maxRestaurants={Math.max(1, Number.parseInt(map.maxRestaurants ?? "25", 10) || 25)}
-          restaurantsCount={count}
-        />
+        <SignupForm signupOpen={map.signupOpen !== "false"} />
       </div>
     </main>
   );

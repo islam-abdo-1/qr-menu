@@ -3,20 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { CheckCircle2, Loader2, Lock, Mail, ShieldCheck, Store, Ban, Users } from "lucide-react";
+import { CheckCircle2, Loader2, Lock, Mail, ShieldCheck, Store, Ban } from "lucide-react";
 import { registerRestaurantAction } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils";
 
-export function SignupForm({
-  signupOpen,
-  maxRestaurants,
-  restaurantsCount,
-}: {
-  signupOpen: boolean;
-  maxRestaurants: number;
-  restaurantsCount: number;
-}) {
-  const remaining = Math.max(0, maxRestaurants - restaurantsCount);
+export function SignupForm({ signupOpen }: { signupOpen: boolean }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -96,35 +87,6 @@ export function SignupForm({
     );
   }
 
-  if (remaining === 0) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45 }}
-        className="relative overflow-hidden rounded-3xl border border-border bg-card shadow-elevated"
-      >
-        <div className="h-1.5 bg-gradient-to-r from-gold via-[#a87a2b] to-gold" />
-        <div className="flex flex-col items-center gap-5 p-10 text-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gold/10 text-gold">
-            <Users className="h-10 w-10" />
-          </div>
-          <h1 className="font-display text-3xl font-bold text-gold-gradient">اكتمل العدد</h1>
-          <p className="max-w-sm text-sm leading-relaxed text-cream/75">
-            وصل عدد المطاعم إلى الحد الأقصى ({maxRestaurants}) — تواصل مع
-            الإدارة لرفع الحد.
-          </p>
-          <Link
-            href="/login"
-            className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-gold to-[#a87a2b] font-black text-background shadow-[0_12px_36px_-10px_rgba(212,168,83,0.55)] transition-all hover:brightness-110 active:scale-[0.98]"
-          >
-            الذهاب لتسجيل الدخول
-          </Link>
-        </div>
-      </motion.div>
-    );
-  }
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 18 }}
@@ -159,14 +121,6 @@ export function SignupForm({
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
-          <div className="flex items-center justify-between rounded-xl border border-gold/20 bg-gold/5 px-4 py-2.5 text-xs font-medium text-cream/80">
-            <span className="flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 text-gold" />
-              مقاعد متاحة حاليًا: {remaining} من {maxRestaurants}
-            </span>
-            {remaining <= 5 && <span className="text-gold">الأماكن محدودة</span>}
-          </div>
-
           <div className="space-y-2">
             <label htmlFor="restaurant-name" className="text-sm font-bold">
               اسم المطعم
