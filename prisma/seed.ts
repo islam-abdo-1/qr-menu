@@ -2,9 +2,13 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import { createClient } from "@supabase/supabase-js";
+import { randomInt } from "crypto";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
+
+/** كود موظفين عشوائي — لا تُطبع أي بيانات اعتماد ثابتة/معروفة في أي مكان (SEC-004) */
+const randomStaffPin = () => String(randomInt(1000, 10000));
 
 const CATEGORIES = [
   {
@@ -46,45 +50,66 @@ async function main() {
   // امسح البيانات القديمة
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
-  await prisma.favorite.deleteMany();
   await prisma.menuItem.deleteMany();
   await prisma.category.deleteMany();
   await prisma.setting.deleteMany();
   await prisma.restaurant.deleteMany();
 
-  // المطعم التجريبي (ownerId يُستبدل بمعرّف حسابك الفعلي في Supabase)
+  // مستأجران للبيئة التطويرية:
+  //  1) kafy — مطعم حقيقي بمالك (DEMO_OWNER_ID أو معرفك الفعلي من Supabase)
+  //  2) demo — العرض التجريبي العام: بلا مالك (ownerId placeholder بلا حساب)،
+  //     بكود موظفين عشوائي غير معلوم، ومُعفى من الفوترة — قراءة فقط (SEC-004)
   const demoOwnerId = process.env.DEMO_OWNER_ID ?? "demo-owner";
-  const restaurant = await prisma.restaurant.create({
-    data: {
+  const restaurants = [
+    {
       slug: "kafy",
       name: "مطعم أبو القوة",
       ownerId: demoOwnerId,
-      staffPin: "2481",
+      staffPin: randomStaffPin(),
     },
-  });
-
-  // الإعدادات
-  await prisma.setting.create({
-    data: {
-      restaurantId: restaurant.id,
-      restaurantName: "مطعم أبو القوة",
-      currency: "EGP",
-      themePrimary: "#C84C21",
+    {
+      slug: "demo",
+      name: "مطعم أبو القوة",
+      ownerId: "demo-owner",
+      staffPin: randomStaffPin(),
+      billingExempt: true,
     },
-  });
+  ];
 
-  // الأقسام والعناصر
-  for (const cat of CATEGORIES) {
-    await prisma.category.create({
+  for (const r of restaurants) {
+    const restaurant = await prisma.restaurant.create({
       data: {
-        name: cat.name,
-        sortOrder: cat.sortOrder,
-        restaurantId: restaurant.id,
-        items: {
-          create: cat.items.map((item) => ({ ...item, restaurantId: restaurant.id })),
-        },
+        slug: r.slug,
+        name: r.name,
+        ownerId: r.ownerId,
+        staffPin: r.staffPin,
+        billingExempt: r.billingExempt ?? false,
       },
     });
+
+    // الإعدادات
+    await prisma.setting.create({
+      data: {
+        restaurantId: restaurant.id,
+        restaurantName: r.name,
+        currency: "EGP",
+        themePrimary: "#C84C21",
+      },
+    });
+
+    // الأقسام والعناصر
+    for (const cat of CATEGORIES) {
+      await prisma.category.create({
+        data: {
+          name: cat.name,
+          sortOrder: cat.sortOrder,
+          restaurantId: restaurant.id,
+          items: {
+            create: cat.items.map((item) => ({ ...item, restaurantId: restaurant.id })),
+          },
+        },
+      });
+    }
   }
 
   // إنشاء bucket عام للصور من لوحة Supabase إن وُجدت المفاتيح

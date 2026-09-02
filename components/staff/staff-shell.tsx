@@ -55,10 +55,22 @@ export function StaffShell({ slug, logoUrl: initialLogoUrl = null }: { slug?: st
 
   const knownNewIds = useRef<Set<string>>(new Set());
   const firstLoad = useRef(true);
+  // فشل متتالي في الجلب (انتهاء الجلسة مثلًا) → وقف الاستطلاع + طلب إعادة الدخول
+  const [sessionLost, setSessionLost] = useState<string | null>(null);
+  const failCount = useRef(0);
 
   const loadOrders = useCallback(async () => {
+    if (sessionLost) return false;
     const res = await getStaffOrdersAction();
-    if (!res.ok) return false;
+    if (!res.ok) {
+      // عطل عابر لا يُقفل الشاشة — فشلان متتاليان فقط = خسارة الجلسة
+      failCount.current += 1;
+      if (failCount.current >= 2) {
+        setSessionLost(res.error || "انتهت الجلسة — أعد الدخول بالاسم والكود السري");
+      }
+      return false;
+    }
+    failCount.current = 0;
     setRestaurantName(res.data.restaurantName);
     setStaffName(res.data.staffName);
     setLogoUrl(res.data.brand.logoUrl || null);
@@ -86,7 +98,7 @@ export function StaffShell({ slug, logoUrl: initialLogoUrl = null }: { slug?: st
     firstLoad.current = false;
     knownNewIds.current = newIds;
     return true;
-  }, []);
+  }, [sessionLost]);
 
   useEffect(() => {
     loadOrders().then(() => {
@@ -96,12 +108,12 @@ export function StaffShell({ slug, logoUrl: initialLogoUrl = null }: { slug?: st
 
   // تحديث تلقائي كل 10 ثوانٍ أثناء العرض (مع توقف عند إخفاء التبويب لتوفير الاستدعاءات)
   useEffect(() => {
-    if (!restaurantName) return;
+    if (!restaurantName || sessionLost) return;
     const t = setInterval(() => {
       if (document.visibilityState === "visible") loadOrders();
     }, 10_000);
     return () => clearInterval(t);
-  }, [restaurantName, loadOrders]);
+  }, [restaurantName, sessionLost, loadOrders]);
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -235,8 +247,38 @@ export function StaffShell({ slug, logoUrl: initialLogoUrl = null }: { slug?: st
   /* ───── لوحة الطلبات ───── */
   const newCount = orders?.filter((o) => o.status === "new").length ?? 0;
 
+  // عند فقدان الجلسة: فكّ الشاشة إلى نموذج الدخول بجرة واحدة
+  function returnToLogin() {
+    setRestaurantName(null);
+    setStaffName(null);
+    setOrders(null);
+    setSessionLost(null);
+    setName("");
+    setPin("");
+    firstLoad.current = true;
+    knownNewIds.current = new Set();
+  }
+
   return (
     <main className="min-h-screen bg-background pb-10">
+      {sessionLost && (
+        <div className="border-b border-destructive/40 bg-destructive/10">
+          <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-black text-destructive">انتهت الجلسة</p>
+              <p className="text-xs text-cream/70">{sessionLost}</p>
+            </div>
+            <button
+              type="button"
+              onClick={returnToLogin}
+              className="flex h-10 items-center justify-center gap-2 rounded-xl bg-destructive px-4 text-sm font-black text-white transition-all hover:brightness-110 active:scale-[0.98]"
+            >
+              <LogOut className="h-4 w-4" />
+              إعادة الدخول
+            </button>
+          </div>
+        </div>
+      )}
       <header className="border-b border-gold/15 bg-[#171310]">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-3 px-4 py-4">
           {logoUrl ? (

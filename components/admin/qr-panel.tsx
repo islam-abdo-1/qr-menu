@@ -33,7 +33,7 @@ export function QrPanel({
     QRCode.toCanvas(
       canvasRef.current,
       url,
-      { width: 540, margin: 3, color: { dark: QR_DARK, light: QR_LIGHT } },
+      { width: 256, margin: 1, color: { dark: QR_DARK, light: QR_LIGHT } },
       (err) => {
         if (err) console.error("[qr]", err);
       },
@@ -94,8 +94,8 @@ export function QrPanel({
 
       <div className="flex flex-col items-center gap-6 p-5 sm:gap-7 sm:p-8">
         <div className="rounded-2xl p-2 shadow-elevated sm:p-2.5">
-          <div className="rounded-xl border-4 border-white bg-white sm:border-8">
-            <canvas ref={canvasRef} aria-label="QR code" className="h-32 w-32 sm:h-40 sm:w-40 lg:h-48 lg:w-48" />
+          <div className="rounded-xl border border-border bg-white p-1.5 sm:border-2">
+            <canvas ref={canvasRef} aria-label="QR code" className="h-28 w-28 sm:h-36 sm:w-36 lg:h-40 lg:w-40" />
           </div>
           <p className="mt-2.5 text-center font-display text-sm font-bold text-cream/80">{restaurantName}</p>
         </div>

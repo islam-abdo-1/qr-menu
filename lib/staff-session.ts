@@ -8,14 +8,27 @@ const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 ساعة بدون «تذكرن
 const REMEMBER_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 يومًا مع «تذكرني»
 
 /**
- * مفتاح توقيع جلسات الموظفين — فشل-مغلق: لا يوجد أي مفتاح احتياطي منشور.
- * غياب SUPABASE_SERVICE_ROLE_KEY (أو قيمة وهمية) = رفض توقيع جلسات الموظفين نهائيًا.
+ * المفتاح الأساسي لتوقيع جلسات الموظفين: STAFF_SESSION_SECRET — سر مستقل تمامًا
+ * عن SUPABASE_SERVICE_ROLE_KEY (فصل الاعتمادات: سر المنصة لا يعلّق على سر القاعدة).
+ * فشل-مغلق: غيابه أو قيمته الوهمية = رفض توقيع جلسات الموظفين نهائيًا.
  */
-function secret(): string {
-  const s = process.env.SUPABASE_SERVICE_ROLE_KEY;
+function primarySecret(): string {
+  const s = process.env.STAFF_SESSION_SECRET;
   if (!s || /^(your-|dummy|staff-dev-secret|sb_publishable)/i.test(s)) {
-    throw new Error("SUPABASE_SERVICE_ROLE_KEY غير مضبوط — جلسات الموظفين معطّلة (فشل مغلق)");
+    throw new Error("STAFF_SESSION_SECRET غير مضبوط — جلسات الموظفين معطّلة (فشل مغلق)");
   }
+  return s;
+}
+
+/**
+ * مفتاح التوقيع القديم (SUPABASE_SERVICE_ROLE_KEY) — يُقبل للتحقق فقط ضمن نافذة
+ * التوافق 30 يومًا: الكوكيز الصادرة قبل النشر تُحترم حتى انتهاء TTL ولا تُسقط
+ * جلسات الموظفين بشكل غير متوقع. تُحذف هذه النافذة بعد 30 يومًا من النشر
+ * (التوقف مقرر تقريبًا 2026-09-18) — لا يصدر أي كوكي جديد بهذا المفتاح.
+ */
+function legacySecret(): string | null {
+  const s = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!s || /^(your-|dummy|staff-dev-secret|sb_publishable)/i.test(s)) return null;
   return s;
 }
 
@@ -31,11 +44,35 @@ function safeEqual(a: string, b: string) {
 
 export type StaffSession = { slug: string; name: string };
 
+/**
+ * ترميز آمن للحمولة: base64url(JSON{slug,name,expires}) —
+ * الاسم قد يحوي نقاطًا («م. أحمد») فالفواصل النقطية كانت تكسر الرص
+ * وتطرد الموظف برسالة جلسة فاسدة.
+ */
+function encodePayload(s: StaffSession, expires: number): string {
+  return Buffer.from(JSON.stringify({ ...s, expires })).toString("base64url");
+}
+
+function decodePayload(raw: string): { slug: string; name: string; expires: number } | null {
+  try {
+    const obj = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
+    if (
+      typeof obj?.slug !== "string" ||
+      typeof obj?.name !== "string" ||
+      typeof obj?.expires !== "number"
+    ) {
+      return null;
+    }
+    return { slug: obj.slug, name: obj.name, expires: obj.expires };
+  } catch {
+    return null;
+  }
+}
+
 export async function setStaffSession(session: StaffSession, remember = true) {
   const ttl = remember ? REMEMBER_TTL_MS : SESSION_TTL_MS;
-  const expires = Date.now() + ttl;
-  const payload = `${session.slug}.${encodeURIComponent(session.name)}.${expires}`;
-  const token = `${payload}.${sign(payload, secret())}`;
+  const payload = encodePayload(session, Date.now() + ttl);
+  const token = `${payload}.${sign(payload, primarySecret())}`;
   const store = await cookies();
   store.set(COOKIE, token, {
     httpOnly: true,
@@ -53,23 +90,28 @@ export async function clearStaffSession() {
 
 /** جلسة الموظف الحالية أو null — أي خلل في الإعداد = لا جلسة (فشل مغلق) */
 export async function getStaffSession(): Promise<StaffSession | null> {
-  let theSecret: string;
+  // مفاتيح التحقق: الأساسي ثم سلف Legacy (نافذة 30 يومًا) — أيٌّ منهما يمرر الكوكي القائم
+  const candidates: string[] = [];
   try {
-    theSecret = secret();
+    candidates.push(primarySecret());
   } catch {
-    return null;
+    /* لا أساسي — نكتفي بالسلف إن وُجد */
   }
+  const legacy = legacySecret();
+  if (legacy && !candidates.includes(legacy)) candidates.push(legacy);
+  if (candidates.length === 0) return null;
+
   const store = await cookies();
   const token = store.get(COOKIE)?.value;
   if (!token) return null;
 
   const parts = token.split(".");
-  if (parts.length !== 4) return null;
-  const payload = `${parts[0]}.${parts[1]}.${parts[2]}`;
-  if (!safeEqual(sign(payload, theSecret), parts[3])) return null;
+  if (parts.length !== 2) return null;
+  if (!candidates.some((key) => safeEqual(sign(parts[0], key), parts[1]))) return null;
 
-  const expires = Number(parts[2]);
-  if (!Number.isFinite(expires) || expires < Date.now()) return null;
+  const data = decodePayload(parts[0]);
+  if (!data) return null;
+  if (!Number.isFinite(data.expires) || data.expires < Date.now()) return null;
 
-  return { slug: parts[0], name: decodeURIComponent(parts[1]) };
+  return { slug: data.slug, name: data.name };
 }

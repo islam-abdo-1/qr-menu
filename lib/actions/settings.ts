@@ -6,11 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { imageUploadSchema, settingsSchema } from "@/lib/validations";
 import { fromZod, fail, ok, type ActionResult } from "@/lib/actions/helpers";
 import { getOwnerRestaurant } from "@/lib/data";
-import { createClient } from "@/lib/supabase/server";
+import { storageUpload, storagePublicUrl, storageDelete } from "@/lib/supabase/storage-rest";
 import { imagePathFromUrl } from "@/lib/supabase/storage";
 import { isOwnerBillingExpired } from "@/lib/billing";
-
-const BUCKET = "menu-images";
 
 export async function updateSettingsAction(
   input: z.infer<typeof settingsSchema>,
@@ -33,8 +31,7 @@ export async function updateSettingsAction(
     if (existing?.logoUrl) {
       const newLogo = parsed.data.logoUrl || null;
       if (newLogo === null || imagePathFromUrl(existing.logoUrl) !== imagePathFromUrl(newLogo)) {
-        const supabase = createClient();
-        await supabase.storage.from(BUCKET).remove([imagePathFromUrl(existing.logoUrl)]);
+        await storageDelete([imagePathFromUrl(existing.logoUrl)]);
       }
     }
 
@@ -61,7 +58,12 @@ export async function updateSettingsAction(
 /** رفع شعار المطعم إلى التخزين (يُعرض في الهيرو والفوتر بإطار ذهبي) */
 export async function uploadLogoImageAction(
   formData: FormData,
-): Promise<ActionResult<{ url: string }>> {
+): Promise<ActionResult<{ url: string; width: number; height: number; sizeKB: number }>> {
+  // قراءة البيانات الوصفية المرسلة من العميل (عرض، ارتفاع، حجم بالكيلوبايت)
+  const width = Number(formData.get("width") ?? "0");
+  const height = Number(formData.get("height") ?? "0");
+  const sizeKB = Number(formData.get("sizeKB") ?? "0");
+
   const file = formData.get("file");
   if (!(file instanceof File)) return fail("لم يتم اختيار صورة");
 
@@ -79,21 +81,16 @@ export async function uploadLogoImageAction(
     const bytes = new Uint8Array(await file.arrayBuffer());
     const isWebp = file.type === "image/webp";
     const path = `logo/${crypto.randomUUID()}.${isWebp ? "webp" : "jpg"}`;
-    const supabase = createClient();
-    const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, {
-      contentType: isWebp ? "image/webp" : "image/jpeg",
-      cacheControl: "3600",
-    });
-    if (error) {
-      console.error("[logo upload]", error);
+    const uploadResult = await storageUpload(path, bytes, isWebp ? "image/webp" : "image/jpeg");
+    if (!uploadResult.ok) {
+      console.error("[logo upload]", uploadResult.error);
       return fail(
-        error.message.includes("permission")
+        uploadResult.error!.includes("permission")
           ? "لا تملك صلاحية الرفع — تحقق من سياسات التخزين"
           : "فشل رفع الشعار إلى التخزين",
       );
     }
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-    return ok({ url: data.publicUrl });
+    return ok({ url: storagePublicUrl(path), width, height, sizeKB });
   } catch (e) {
     console.error("[logo upload]", e);
     return fail("فشل رفع الشعار");

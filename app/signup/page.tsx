@@ -12,6 +12,9 @@ export default async function SignupPage() {
   const rows = await prisma.siteSetting.findMany();
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
 
+  // التسجيل مغلق افتراضيًا — يُفتح فقط بإعداد صريح "true" من لوحة المالك
+  const signupOpen = map.signupOpen === "true";
+
   return (
     <main className="texture-dots relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10">
       {/* زخارف خلفية */}
@@ -20,7 +23,7 @@ export default async function SignupPage() {
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" aria-hidden />
 
       <div className="relative w-full max-w-md">
-        <SignupForm signupOpen={map.signupOpen !== "false"} />
+        <SignupForm signupOpen={signupOpen} />
       </div>
     </main>
   );

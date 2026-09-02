@@ -27,6 +27,39 @@ type Props = {
 
 const t = (locale: "ar" | "en", ar: string, en: string) => (locale === "ar" ? ar : en);
 
+/* ───── مفتاح تفرد الطلب (SEC-002) — ثابت لكل سلة ▸ إعادة الإرسال تعيد الطلب نفسه ───── */
+function cartHashKey(items: CartItem[]): string {
+  return items
+    .slice()
+    .sort((a, b) =>
+      `${a.itemId}|${a.sizeCode ?? ""}`.localeCompare(`${b.itemId}|${b.sizeCode ?? ""}`),
+    )
+    .map((i) => `${i.itemId}::${i.sizeCode ?? ""}::${i.qty}`)
+    .join(",");
+}
+
+function makeOrderNonce(slug: string, items: CartItem[]): string {
+  const nonceKey = `${slug}:order-nonce`;
+  const cartKey = `${slug}:order-cart-hash`;
+  const hash = cartHashKey(items);
+  const prev = sessionStorage.getItem(nonceKey);
+  if (prev && sessionStorage.getItem(cartKey) === hash && /^[A-Za-z0-9_-]{16,64}$/.test(prev)) {
+    return prev; // نفس السلة — نفس النونس ▸ أي إعادة إرسال (شبكة/نقر مزدوج) لن تُنشئ طلبًا مكررًا
+  }
+  const fresh =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID().replace(/-/g, "")
+      : `x-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  sessionStorage.setItem(nonceKey, fresh);
+  sessionStorage.setItem(cartKey, hash);
+  return fresh;
+}
+
+function clearOrderNonce(slug: string) {
+  sessionStorage.removeItem(`${slug}:order-nonce`);
+  sessionStorage.removeItem(`${slug}:order-cart-hash`);
+}
+
 type Step = "cart" | "checkout" | "success";
 
 export function CartDrawer({
@@ -111,10 +144,18 @@ export function CartDrawer({
       phone: type === "delivery" ? phone : undefined,
       address: type === "delivery" ? address : undefined,
       notes: notes || undefined,
-      items: items.map((i) => ({ itemId: i.itemId, qty: i.qty })),
+      cartNonce: makeOrderNonce(slug, items),
+      items: items.map((i) => ({
+        itemId: i.itemId,
+        qty: i.qty,
+        // المقاس يُرسل دائمًا — بدونه يحسب السيرفر سعر الصنف الأساسي،
+        // فيُبتلع سعر المقاس الأكبر وتتوه التجهيزات في المطبخ.
+        sizeCode: i.sizeCode ?? null,
+      })),
     });
     setLoading(false);
     if (res.ok) {
+      clearOrderNonce(slug);
       setOrderNumber(res.data.number);
       setStep("success");
       onOrderPlaced();

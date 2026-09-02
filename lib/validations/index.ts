@@ -25,6 +25,10 @@ export const menuItemSchema = z.object({
     .optional(),
   categoryId: z.string().min(1, "اختر قسمًا"),
   imageUrl: z.string().trim().max(500).optional().nullable(),
+  // بيانات تعريف الصورة المضغوطة — تُحسب على الخادم أثناء الرفع (قراءة فقط)
+  imageWidth: z.coerce.number().int().min(1).max(20000).optional().nullable(),
+  imageHeight: z.coerce.number().int().min(1).max(20000).optional().nullable(),
+  imageSizeKB: z.coerce.number().int().min(1).max(20000).optional().nullable(),
   isAvailable: z.boolean().optional(),
   // خصم نسبة (0-100) — null/0 = بدون خصم
   discountPercentage: z.coerce
@@ -69,6 +73,9 @@ export const settingsSchema = z.object({
     .regex(/^#[0-9a-fA-F]{6}$/, "لون غير صالح (مثال: #C84C21)")
     .optional(),
   logoUrl: z.string().trim().max(500).optional().nullable(),
+  logoWidth: z.coerce.number().int().min(1).max(20000).optional().nullable(),
+  logoHeight: z.coerce.number().int().min(1).max(20000).optional().nullable(),
+  logoSizeKB: z.coerce.number().int().min(1).max(20000).optional().nullable(),
   deliveryEnabled: z.boolean().optional(),
 });
 
@@ -100,12 +107,17 @@ export const orderSchema = z.object({
   phone: z.string().trim().max(20).optional(),
   address: z.string().trim().max(300).optional(),
   notes: z.string().trim().max(300).optional(),
+  // مفتاح تفرد اختياري من العميل — يحوّل إعادة الإرسال إلى ردّ بالطلب نفسه (بلا طلب مكرر)
+  cartNonce: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{16,64}$/, "معرف الإرسال غير صالح")
+    .optional(),
   items: z
     .array(
       z.object({
         itemId: z.string().min(1),
         qty: z.number().int().min(1).max(50),
-        sizeCode: z.string().trim().max(4).optional().nullable(),
+        sizeCode: z.string().trim().max(12).optional().nullable(),
       }),
     )
     .min(1, "السلة فارغة")

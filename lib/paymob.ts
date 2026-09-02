@@ -1,8 +1,14 @@
 import "server-only";
-import { createHmac, randomUUID } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
+import { randomUUID } from "crypto";
 
 /** بوابة Paymob — تُفعَّل تلقائيًا بمجرد وضع المفاتيح في البيئة (المرحلة ب/ج) */
 const API = "https://accept.paymob.com/api";
+
+/** توليد مرجع دفع فريد محليًا — يستخدم لربط الدفعة المعلّقة بالرد من البوابة */
+export function newPaymentRef(): string {
+  return `pay_${randomUUID().replace(/-/g, '').slice(0, 24)}`;
+}
 
 export function isPaymobConfigured(): boolean {
   const key = process.env.PAYMOB_API_KEY;
@@ -113,6 +119,17 @@ const HMAC_FIELDS = [
   "txn_response_codes",
 ];
 
+/**
+ * مقارنة HMAC بثبات زمني (SEC-010): timingSafeEqual يرفض اختلاف الطول
+ * مباشرة (لا توقيت قياسي للطول) ولا يتوقف عند أول بايت مختلف.
+ */
+export function safeHmacEqual(expected: string, actual: string): boolean {
+  const expectedBuf = Buffer.from(expected, "utf8");
+  const actualBuf = Buffer.from(actual, "utf8");
+  if (expectedBuf.length !== actualBuf.length) return false;
+  return timingSafeEqual(expectedBuf, actualBuf);
+}
+
 /** تحقق HMAC-SHA512 من رد Paymob — يمنع التزوير ويضمن أن الرد من البوابة فعلًا */
 export function verifyPaymobSignature(
   obj: Record<string, unknown>,
@@ -122,10 +139,36 @@ export function verifyPaymobSignature(
   if (!secret || !hmac) return false;
   const text = HMAC_FIELDS.map((f) => String(obj[f] ?? "")).join("|");
   const digest = createHmac("sha512", secret).update(text).digest("hex");
-  return digest === hmac;
+  return safeHmacEqual(digest, hmac);
 }
 
-/** مرجع دفعة داخل المنصة — مرادف paymobRef */
-export function newPaymentRef(): string {
-  return `pm-${randomUUID()}`;
+/** حقول قرار التسوية المستخلصة من رد البوابة */
+export type PaymobSettlementInput = {
+  currentStatus: string; // الحالة المسجلة في قاعدة البيانات
+  success: boolean; // obj.success === "true"
+  pending: boolean; // obj.pending === "true"
+  amountCents: number;
+  expectedCents: number;
+};
+
+export type PaymobSettlementDecision =
+  | { action: "ignore" } // معالجة لاحقة مسبقًا (replay) — لا لمسة إطلاقًا
+  | { action: "stay-pending" } // دفعة معلّقة — قرار البوابة لم يصل بعد، لا نُعلّمه نهائيًا
+  | { action: "fail" } // فشل/إلغاء/مبلغ غير مطابق
+  | { action: "pay" }; // نجاح + مبلغ مطابق — الإتمام والتمديد فقط هنا
+
+/**
+ * آلة قرار التسوية النقية (SEC-011):
+ * - الرد الوحيد الموثوق هو callback البوابة — لا يُبنى أي قرار على إعادة توجيه المتصفح.
+ * - المعالجة مرة واحدة فقط (replay = تجاهل) — لا اشتراك مزدوج.
+ * - pending لا يُعلَّم failed أبدًا: يبقى معلقًا حتى الحسم النهائي (نجاح/فشل).
+ */
+export function paymobSettlementDecision(
+  i: PaymobSettlementInput,
+): PaymobSettlementDecision {
+  if (i.currentStatus !== "pending") return { action: "ignore" };
+  if (i.pending) return { action: "stay-pending" };
+  if (!i.success) return { action: "fail" };
+  if (i.amountCents !== i.expectedCents) return { action: "fail" };
+  return { action: "pay" };
 }

@@ -21,7 +21,8 @@ async function main() {
   const dir = process.argv[2];
   if (!dir) throw new Error("استخدم: node scripts/apply-migration.cjs <folder-name>");
   const sqlFile = path.join(__dirname, "..", "prisma", "migrations", dir, "migration.sql");
-  const sql = fs.readFileSync(sqlFile, "utf8");
+  let sql = fs.readFileSync(sqlFile, "utf8");
+  if (sql.charCodeAt(0) === 0xfeff) sql = sql.slice(1); // تجريد BOM (محررات Windows)
   const checksum = require("crypto").createHash("sha256").update(sql).digest("hex");
 
   await client.connect();

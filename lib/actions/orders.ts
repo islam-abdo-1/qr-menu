@@ -129,6 +129,7 @@ export type CreateOrderInput = {
   phone?: string;
   address?: string;
   notes?: string;
+  cartNonce?: string;
   items: { itemId: string; qty: number; sizeCode?: string | null }[];
 };
 

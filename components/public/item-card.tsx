@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { motion } from "framer-motion";
 import { Flame, Plus, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
@@ -14,7 +13,6 @@ type Props = {
   currency: string;
   locale: "ar" | "en";
   index?: number;
-  delay?: number;
   themePrimary?: string;
   logoUrl?: string | null;
   qtyInCart?: number;
@@ -30,7 +28,6 @@ export function ItemCard({
   currency,
   locale,
   index = 0,
-  delay = 0,
   themePrimary,
   logoUrl,
   qtyInCart = 0,
@@ -38,18 +35,8 @@ export function ItemCard({
   onOpenDetails,
   bestSeller = false,
 }: Props) {
-  const sizes = item.sizes ?? [];
+  const sizes = useMemo(() => item.sizes ?? [], [item.sizes]);
   const hasDiscount = (item.discountPercentage ?? 0) > 0;
-
-  // على الشاشات الصغيرة نخفف حركة الدخول (بدون إزاحة Y) لسلاسة التمرير
-  const [lightMotion, setLightMotion] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 639px)");
-    setLightMotion(mq.matches);
-    const fn = (e: MediaQueryListEvent) => setLightMotion(e.matches);
-    mq.addEventListener("change", fn);
-    return () => mq.removeEventListener("change", fn);
-  }, []);
 
   // المقاس المختار (إن وُجدت مقاسات) — يُصفَّر عند تغيّر العنصر
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -62,17 +49,39 @@ export function ItemCard({
   const finalPrice = applyDiscount(basePrice, item.discountPercentage);
   const saveable = !sizes.length || selectedSize !== null;
 
+  // Memoized size price formatting for button tooltips
+  const formattedSizePrices = useMemo(
+    () => new Map(sizes.map((s) => [s.sizeCode, formatPrice(applyDiscount(s.price, item.discountPercentage), currency, locale)])),
+    [sizes, item.discountPercentage, currency, locale]
+  );
+
+  // Memoized price formatting to avoid repeated calculations
+  const formattedFinalPrice = useMemo(
+    () => formatPrice(finalPrice, currency, locale),
+    [finalPrice, currency, locale]
+  );
+  const formattedBasePrice = useMemo(
+    () => formatPrice(basePrice, currency, locale),
+    [basePrice, currency, locale]
+  );
+  const formattedMinSizePrice = useMemo(
+    () =>
+      sizes.length > 0
+        ? formatPrice(
+            Math.min(...sizes.map((s) => applyDiscount(s.price, item.discountPercentage))),
+            currency,
+            locale
+          )
+        : null,
+    [sizes, item.discountPercentage, currency, locale]
+  );
+
   return (
-    <motion.article
-      initial={lightMotion ? { opacity: 0 } : { opacity: 0, y: 22 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-40px" }}
-      transition={{
-        duration: lightMotion ? 0.25 : 0.5,
-        delay: lightMotion ? 0 : Math.min(index * 0.06 + delay, 0.45),
-        ease: "easeOut",
-      }}
-      className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-1.5 hover:border-gold/40 hover:shadow-[0_24px_60px_-24px_rgba(212,168,83,0.35)]"
+    <article
+      className={cn(
+        "group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-1.5 hover:border-gold/40 hover:shadow-[0_24px_60px_-24px_rgba(212,168,83,0.35)]",
+        "animate-fade-in-up"
+      )}
       onClick={onOpenDetails}
       onKeyDown={(e) => {
         if (onOpenDetails && (e.key === "Enter" || e.key === " ")) {
@@ -91,9 +100,12 @@ export function ItemCard({
             src={item.imageUrl}
             alt={item.name}
             fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 33vw"
-            loading="lazy"
+            sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 25vw"
+            loading={index < 6 ? "eager" : "lazy"}
+            fetchPriority={index < 6 ? "high" : "auto"}
             quality={80}
+            placeholder="blur"
+            blurDataURL={item.imageBlurDataURL ?? undefined}
             className="object-cover transition-transform duration-500 group-hover:scale-110"
           />
         ) : (
@@ -172,11 +184,11 @@ export function ItemCard({
             <>
               {hasDiscount && basePrice !== finalPrice ? (
                 <del className="text-[11px] font-semibold text-cream/45 sm:text-xs">
-                  {formatPrice(basePrice, currency, locale)}
+                  {formattedBasePrice}
                 </del>
               ) : null}
               <span className="text-sm font-black text-[#3ECF7A] sm:text-base">
-                {formatPrice(finalPrice, currency, locale)}
+                {formattedFinalPrice}
               </span>
               <span className="rounded-full border border-gold/40 bg-gold/10 px-1.5 py-0.5 text-[10px] font-black text-gold">
                 {selected.sizeCode}
@@ -185,21 +197,17 @@ export function ItemCard({
           ) : sizes.length > 0 ? (
             <span className="text-[11px] font-black text-gold sm:text-xs">
               {locale === "ar" ? "بدءًا من" : "From"}{" "}
-              {formatPrice(
-                Math.min(...sizes.map((s) => applyDiscount(s.price, item.discountPercentage))),
-                currency,
-                locale,
-              )}
+              {formattedMinSizePrice}
             </span>
           ) : (
             <>
               {hasDiscount && basePrice !== finalPrice ? (
                 <del className="text-[11px] font-semibold text-cream/45 sm:text-xs">
-                  {formatPrice(basePrice, currency, locale)}
+                  {formattedBasePrice}
                 </del>
               ) : null}
               <span className="text-sm font-black text-[#3ECF7A] sm:text-base">
-                {formatPrice(finalPrice, currency, locale)}
+                {formattedFinalPrice}
               </span>
             </>
           )}
@@ -210,7 +218,7 @@ export function ItemCard({
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5 sm:mt-3">
             {sizes.map((s) => {
               const isOn = selectedSize === s.sizeCode;
-              const sFinal = applyDiscount(s.price, item.discountPercentage);
+              const _sFinal = applyDiscount(s.price, item.discountPercentage);
               return (
                 <button
                   key={s.sizeCode}
@@ -220,7 +228,7 @@ export function ItemCard({
                     setSelectedSize(isOn ? null : s.sizeCode);
                   }}
                   aria-pressed={isOn}
-                  title={`${s.sizeCode} — ${formatPrice(sFinal, currency, locale)}`}
+                  title={`${s.sizeCode} — ${formattedSizePrices.get(s.sizeCode)}`}
                   className={cn(
                     "flex h-8 min-w-8 items-center justify-center rounded-lg border px-1.5 text-[10px] font-black transition-all active:scale-95 sm:min-w-9 sm:px-2 sm:text-[11px]",
                     isOn
@@ -290,6 +298,6 @@ export function ItemCard({
         className="pointer-events-none absolute inset-x-0 top-0 h-[3px] origin-left scale-x-0 bg-gradient-to-r from-gold via-primary to-gold transition-transform duration-300 group-hover:scale-x-100"
         aria-hidden
       />
-    </motion.article>
+    </article>
   );
 }

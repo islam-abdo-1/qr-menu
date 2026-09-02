@@ -9,9 +9,12 @@ import { uploadLogoImageAction } from "@/lib/actions/settings";
 import { compressToWebp, formatBytes } from "@/lib/client/image";
 import { cn } from "@/lib/utils";
 
+/** بيانات تعريف الصورة المضغوطة — محسوبة على الخادم وتُحفظ في القاعدة مع الـ URL */
+export type UploadedImageMeta = { width: number; height: number; sizeKB: number };
+
 type Props = {
   value: string | null;
-  onChange: (url: string | null) => void;
+  onChange: (url: string | null, meta?: UploadedImageMeta | null) => void;
   /** حدد `logo` لرفع شعار المطعم بدل صورة عنصر */
   kind?: "item" | "logo";
 };
@@ -69,18 +72,27 @@ export function ImageUploader({ value, onChange, kind = "item" }: Props) {
 
     try {
       setBusy("compress");
-      const { blob } = await compressToWebp(file);
+      const { blob, width, height } = await compressToWebp(file);
       setBusy("upload");
+
+      const sizeKB = Math.max(1, Math.round(blob.size / 1024));
 
       const fd = new FormData();
       fd.append("file", blob, blob.type === "image/webp" ? "menu.webp" : "menu.jpg");
+      fd.append("width", String(width));
+      fd.append("height", String(height));
+      fd.append("sizeKB", String(sizeKB));
 
       const res = await uploadAction(fd);
       setBusy(null);
       if (res.ok) {
-        setResultSize(blob.size);
-        onChange(res.data.url);
-        toast.success(`تم رفع ${noun} وضغطه تلقائيًا (${formatBytes(blob.size)})`);
+        setResultSize(res.data.sizeKB * 1024);
+        onChange(res.data.url, {
+          width: res.data.width,
+          height: res.data.height,
+          sizeKB: res.data.sizeKB,
+        });
+        toast.success(`تم رفع ${noun} وضغطه تلقائيًا (${formatBytes(res.data.sizeKB * 1024)})`);
       } else {
         setError(res.error);
         toast.error(res.error);
@@ -153,7 +165,7 @@ export function ImageUploader({ value, onChange, kind = "item" }: Props) {
               <button
                 type="button"
                 onClick={() => {
-                  onChange(null);
+                  onChange(null, null);
                   setResultSize(null);
                 }}
                 className="flex items-center gap-1 rounded-lg border border-destructive/40 px-2.5 py-1 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/10"

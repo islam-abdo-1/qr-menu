@@ -1,75 +1,103 @@
-# QR Menu — نظام منيو رقمي بأكواد QR لمطعم واحد
+# QR Menu — منصة منيو رقمي بأكواد QR (متعدد المطاعم)
 
 Stack: **Next.js 14 (App Router) + TypeScript Strict + Tailwind + Shadcn UI + Prisma + Supabase (PostgreSQL/Auth/Storage) + Vercel**
 
+تطبيقان منفصلان (مشروعا Vercel مستقلان):
+
+| التطبيق | الدور | الرابط |
+|---|---|---|
+| `qr-menu` (هذا المجلد) | المنيو العام + لوحة المالك + موظفو المطعم + بوابة الدفع | `site-menu.ddnsfree.com` |
+| `owner-app` (مجلد شقيق) | لوحة مالك المنصة: إدارة المطاعم/المستخدمين/الفوترة | `owner-qr-menu.vercel.app` |
+
 الميزات:
-- منيو عام `/` (عربي RTL) و `/en` (إنجليزي) — **صفحات Static/ISR**: تُبنى مرة واحدة ولا تلمس قاعدة البيانات عند أي طلب.
-- لوحة إدارة `/admin` محمية بالكامل (middleware + فحص جلسة على الخادم) — لا توجد أي روابط لها من المنيو العام.
-- CRUD كامل للأقسام والعناصر + إخفاء/إظهار فوري (RevalidateTag).
-- رفع صور مضغوطة تلقائيًا إلى **WebP** عبر Supabase Storage، وعرضها بـ `next/image`.
-- توليد رمز QR للمنيو مع تحميل PNG عالي الدقة للطباعة.
-- تحقق `zod` من كل المدخلات + تعقيم النصوص (حماية XSS/حقن).
+
+- منيو عام `/` (عربي RTL) — صفحة **Static/ISR** (إعادة بناء كل 300 ثانية + `revalidateTag` فوري).
+- لوحة مالك `/admin` محمية للمطعم نفسه؛ موظفو المطعم عبر `/staff/[slug]` بكود PIN مشترك.
+- CRUD للأقسام/العناصر/الطاولات + إخفاء فوري + رفع صور مفروض ضغطه إلى WebP.
+- طلبات العملاء مع مضاد تكرار (cartNonce) وكوتا نافذة ذرية (OrderWindow) وتقارير مبيعات (DayStat).
+- اشتراكات: تجربة 7 أيام + خطط شهرية/سنوية (Paymob عند التفعيل، أو يدوية من لوحة المالك).
+- عرض تجريبي معزول `demo` (قراءة فقط — SEC-004).
 
 ---
 
 ## 1) إعداد Supabase (مرة واحدة)
 
 1. أنشئ مشروعًا على [supabase.com](https://supabase.com).
-2. من **Project Settings → Database** خذ:
-   - `DATABASE_URL`: رابط **Transaction pooler** (منفذ `6543`).
-   - `DIRECT_URL`: رابط **Direct connection** (منفذ `5432`) — للـ migrations محليًا.
-3. من **Project Settings → API** خذ `NEXT_PUBLIC_SUPABASE_URL` و `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-4. من **Authentication → Providers** تأكد أن **Email** مفعّل، ثم أنشئ مستخدم أدمن: **Authentication → Users → Add user** (البريد + كلمة مرور من 8 أحرف).
-5. أنشئ **bucket عام** باسم `menu-images` (Storage → New bucket → Public).
-6. أضف سياسات RLS لرفع الصور (SQL Editor):
+2. من **Project Settings → Database**: `DATABASE_URL` (Transaction pooler، منفذ `6543`) و`DIRECT_URL` (Direct، منفذ `5432` — للـ migrations).
+3. من **Project Settings → API**: `NEXT_PUBLIC_SUPABASE_URL` و`NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+4. **Authentication → Providers**: فعّل Email (Auto Confirm اختياري — يُفحص بـ `security:auth`).
+5. أنشئ bucket عام `menu-images` مع سياسات RLS (لا كتابة لأدوار anon/authenticated — الكتابة service-role حصريًا):
 
 ```sql
--- قراءة عامة للصور
 create policy "public read" on storage.objects
   for select using (bucket_id = 'menu-images');
 
--- رفع/حذف/تحديث من المستخدم المسجّل فقط
-create policy "auth insert" on storage.objects
-  for insert to authenticated with check (bucket_id = 'menu-images');
-create policy "auth update" on storage.objects
-  for update to authenticated using (bucket_id = 'menu-images');
-create policy "auth delete" on storage.objects
-  for delete to authenticated using (bucket_id = 'menu-images');
+create policy "menu_images_all_service" on storage.objects
+  for all to service_role using (bucket_id = 'menu-images')
+  with check (bucket_id = 'menu-images');
 ```
+
+> التحقق تلقائيًا: `npm run security:probe` — يفحص الجداول الـ16 + سياسات storage + عدم وجود كتابة لـ anon/authenticated.
 
 ## 2) إعداد المشروع محليًا
 
 ```bash
 npm install
-# انسخ قالب المتغيرات واملأه بقيمك الحقيقية
-copy .env.example .env.local
-# ثم حرّر .env.local
-
-# إنشاء الجداول في قاعدة البيانات + بيانات تجريبية
-npm run prisma:migrate
-npm run db:seed
-
-npm run dev   # → http://localhost:3000
+copy .env.example .env.local   # ثم حرّر القيم الحقيقية
+npm run prisma:migrate         # بناء الجداول (المصدر الوحيد: prisma/migrations)
+npm run db:seed                # بيانات تجريبية
+npm run dev                    # → http://localhost:3000
 ```
-
-- المنيو العام: `http://localhost:3000` — لوحة الإدارة: `http://localhost:3000/admin` — الدخول: `http://localhost:3000/login`.
 
 ## 3) النشر على Vercel
 
-1. ارفع المشروع إلى GitHub ثم استورده في Vercel.
-2. أضف نفس المتغيرات من `.env.local` في **Settings → Environment Variables** (بما فيها `DATABASE_URL` و `DIRECT_URL`).
-3. في **Settings → Build**:
-   - Install Command: `npm install`
-   - Build Command: `npm run build`
-4. بعد أول نشر ناجح، نفّذ المهاجرة على قاعدة الإنتاج من جهازك:
-   ```bash
-   npx prisma migrate deploy
-   ```
-5. ضع `NEXT_PUBLIC_SITE_URL` = رابط موقعك النهائي (يستخدمه رمز QR).
-6. أنشئ مستخدم الأدمن من لوحة Supabase كما في الخطوة 4 أعلاه.
+1. ارفع المشروع إلى GitHub واستورده في Vercel (التطبيقان منفصلان).
+2. أضف نفس متغيرات `.env.local` في **Settings → Environment Variables**.
+3. بعد أول نشر: `npx prisma migrate deploy` على قاعدة الإنتاج.
+4. `NEXT_PUBLIC_SITE_URL` = رابط الموقع النهائي (يستخدمه رمز QR).
+5. أنشئ مستخدم الأدمن من لوحة Supabase، ثم أنشئ `owner-app` للسوبر-أدمن (Super Admin: `SUPER_ADMIN_EMAIL` + مفاتيح Supabase نفسها).
+
+### متغيرات خاصة بالبريد/السر (بلا قيم افتراضية آمنة)
+
+| المتغير | الغرض |
+|---|---|
+| `SUPABASE_SERVICE_ROLE_KEY` | service-role للخادم فقط (حذف صور/مستخدمين، seed) |
+| `STAFF_SESSION_SECRET` | توقيع جلسات الموظفين (HMAC) — فشل-مغلق عند غيابه |
+| `PURGE_SECRET` | تطهير الكاش بين التطبيقين (POST `/api/purge`) |
+| `CRON_SECRET` | حماية مهمة الصيانة `/api/system/clean` (يرسلها Vercel تلقائيًا) |
+| `MAIN_SITE_URL` | رابط qr-menu من owner-app (للتطهير) |
+
+---
+
+## قرارات معمارية وأمنية (وثيقة الإسناد)
+
+- **عزل المستأجرات على طبقة التطبيق**: مفتاح «مطعم المالك» يُشتق من هوية الجلسة لكل إجراء (بوابات `lib/authz.ts` فوق `authz-core`)، وكل استعلام يُقيَّد بـ `restaurant.id`/`slug` — قرار واحد مركزي قابل للاختبار.
+- **RLS**: كل الجداول مغلقة (لا قراءة/كتابة لـ anon/authenticated)؛ الوصول عبر Prisma بدور `postgres` (المالك الفعلي) — لا service-role على مسار القراءة العام.
+- **الجلسات**: فك JWT محلي + تحقق توقيع صفري الشبكة (`lib/jwt.ts`)؛ تجديد refresh في الـ middleware حصرًا (يَمْنع سباق تدوير التوكن)؛ كوكيز HttpOnly + `Secure` في الإنتاج (`lib/session-cookies.ts`).
+- **الموظفون**: جلسة HMAC مستقلة (`lib/staff-session.ts`) + إعادة فحص حية للحظر/الاشتراك عند كل استخدام.
+- **الديمو**: مستأجر `demo` معزول — رفض خادمي لأي إنشاء طلب/دخول موظفين (SEC-004).
+- **الفوترة**: قواعد موحدة في `lib/billing-core.ts` — نسختان متطابقتان حرفيًا في التطبيقين يفرض تطابقهما اختبار (`tests/billing-core.test.ts`).
+- **الصيانة**: مهمة يومية `vercel.json` ← `/api/system/clean` (محمية بـ `CRON_SECRET`): احتفاظ لكل جدول، دفعات ≤500 بسقف 20، أخطاء معزولة — خارج مسار إنشاء الطلبات.
+- **مصدر الحقيقة للقاعدة**: `prisma/migrations` فقط — يفحصها/يعيد بناءها `security:migrations` (بلا انجراف عن schema.prisma).
+
+---
+
+## الفحوصات والاختبارات
+
+```bash
+npm test                     # الوحدات (vitest)
+npm run lint && npm run build
+npm run security:probe       # RLS + سياسات storage (SEC-003)
+npm run security:orders      # مضاد التكرار/الكوتا (SEC-002)
+npm run security:payments    # تسوية Paymob (SEC-011)
+npm run security:migrations  # مطابقة migrations ↔ schema (SEC-003)
+npm run security:auth        # تأكيد البريد/التسجيل (SEC-008)
+```
+
+> `owner-app` بلا سكربتات أمان خاصة — مواده خالصة تُختبر من `qr-menu/tests` عبر استيراد نسبي.
 
 ## ملاحظات تقنية
 
-- **الأداء**: المنيو العام صفحة Static تُعاد إنشاؤها كل 300 ثانية، وبياناته في كاش `revalidateTag('menu')` يُمسح فور أي تعديل من الأدمن — آلاف الزوار المتزامنون لا يضربون قاعدة البيانات إطلاقًا.
-- **الأمان**: لا تكشف `SUPABASE_SERVICE_ROLE_KEY` أبدًا للمتصفح (تُستخدم فقط في seed). المتغيرات الحقيقية في `.env.local` فقط (مستثنى من git).
-- **الترخيص**: إخفاء عنصر = يختفي فورًا من العامة؛ حذف قسم يحذف صور عناصره من Storage.
+- **الأداء**: المنيو العام كاش ISR 300 ثانية — آلاف الزوار لا يلمسون القاعدة عند أي طلب.
+- **الأمان**: `SUPABASE_SERVICE_ROLE_KEY` لا يصل للمتصفح أبدًا؛ الأسرّ كلها في `.env*.local` (مستثناة من git).
+- **الترخيص**: إخفاء عنصر = اختفاء فوري من العامة؛ حذف قسم يحذف صور عناصره من Storage.

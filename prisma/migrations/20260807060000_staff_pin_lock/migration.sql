@@ -1,2 +1,2 @@
-﻿ALTER TABLE "Restaurant" ADD COLUMN "pinFailedAttempts" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Restaurant" ADD COLUMN "pinFailedAttempts" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "Restaurant" ADD COLUMN "pinLockedUntil" TIMESTAMP(3);

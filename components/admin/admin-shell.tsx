@@ -14,6 +14,7 @@ import {
   QrCode,
   Settings,
   ShoppingBag,
+  Sparkles,
   Table2,
   Tags,
   Users,
@@ -28,6 +29,7 @@ import { ItemsPanel } from "@/components/admin/items-panel";
 import { CategoriesPanel } from "@/components/admin/categories-panel";
 import { SettingsPanel } from "@/components/admin/settings-panel";
 import { QrPanel } from "@/components/admin/qr-panel";
+import { AiMenuPanel } from "@/components/admin/ai-menu/ai-menu-panel";
 import { OrdersPanel } from "@/components/admin/orders-panel";
 import { ReportsPanel } from "@/components/admin/reports-panel";
 import { TablesPanel } from "@/components/admin/tables-panel";
@@ -38,6 +40,7 @@ import type { AdminData } from "@/components/admin/types";
 
 type Tab =
   | "orders"
+  | "ai-import"
   | "items"
   | "categories"
   | "settings"
@@ -49,6 +52,7 @@ type Tab =
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "orders", label: "الطلبات", icon: ClipboardList },
+  { id: "ai-import", label: "المستورد الذكي", icon: Sparkles },
   { id: "reports", label: "التقارير", icon: BarChart3 },
   { id: "items", label: "العناصر", icon: ShoppingBag },
   { id: "categories", label: "الأقسام", icon: Tags },
@@ -68,10 +72,22 @@ export function AdminShell({ data }: { data: AdminData }) {
   const [newBadge, setNewBadge] = useState(0);
   const knownNewIds = useRef<Set<string>>(new Set());
   const firstLoad = useRef(true);
+  // فشل متتالي في الجلب (انتهاء الجلسة مثلًا) → وقف الاستطلاع + لافتة دخول
+  const [sessionLost, setSessionLost] = useState<string | null>(null);
+  const failCount = useRef(0);
 
   const pollOrders = useCallback(async () => {
+    if (sessionLost) return;
     const res = await getOrdersAction();
-    if (!res.ok) return;
+    if (!res.ok) {
+      // عطل عابر (شبكة/خادم) لا يُقفل اللوحة — فشلان متتاليان فقط = خسارة الجلسة
+      failCount.current += 1;
+      if (failCount.current >= 2) {
+        setSessionLost(res.error || "انتهت الجلسة — أعد تسجيل الدخول");
+      }
+      return;
+    }
+    failCount.current = 0;
     setOrders(res.data);
     const newIds = new Set(res.data.filter((o) => o.status === "new").map((o) => o.id));
     if (!firstLoad.current) {
@@ -91,7 +107,7 @@ export function AdminShell({ data }: { data: AdminData }) {
     firstLoad.current = false;
     knownNewIds.current = newIds;
     setNewBadge(newIds.size);
-  }, []);
+  }, [sessionLost]);
 
   useEffect(() => {
     pollOrders();
@@ -101,6 +117,16 @@ export function AdminShell({ data }: { data: AdminData }) {
     }, 20_000);
     return () => clearInterval(t);
   }, [pollOrders]);
+
+  // عند فقدان الجلسة لا نكمل الاستطلاع حتى إعادة الدخول
+  useEffect(() => {
+    if (sessionLost) {
+      const t = setInterval(() => {
+        router.refresh();
+      }, 15_000);
+      return () => clearInterval(t);
+    }
+  }, [sessionLost, router]);
 
   const menuPath = `/m/${data.restaurant.slug}`;
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
@@ -224,6 +250,23 @@ export function AdminShell({ data }: { data: AdminData }) {
       {/* ───── المحتوى ───── */}
       <main className="min-w-0 flex-1 p-4 pb-28 sm:p-8 sm:pb-8 lg:pb-8">
         <div className="mx-auto max-w-5xl">
+          {sessionLost && (
+            <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-destructive/40 bg-destructive/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-black text-destructive">انتهت الجلسة</p>
+                <p className="mt-0.5 text-sm text-cream/70">{sessionLost}</p>
+              </div>
+              <Button
+                onClick={() => {
+                  router.push("/login");
+                  router.refresh();
+                }}
+              >
+                تسجيل الدخول من جديد
+              </Button>
+            </div>
+          )}
+
           {data.billingStatus === "trial" && (
             <TrialBanner daysLeft={data.trialDaysLeft} onOpenBilling={() => setTab("billing")} />
           )}
@@ -275,6 +318,13 @@ export function AdminShell({ data }: { data: AdminData }) {
             />
           )}
           {tab === "billing" && <BillingPanel data={data} />}
+          {tab === "ai-import" && (
+            <AiMenuPanel
+              restaurantId={data.restaurant.id}
+              currency={data.settings.currency || "EGP"}
+              onChanged={onChanged}
+            />
+          )}
           {tab === "qr" && <QrPanel restaurantName={data.settings.restaurantName} menuUrl={menuUrl} />}
         </div>
       </main>

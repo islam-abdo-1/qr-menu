@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { ChevronDown, ScanLine, ShoppingBag, Sparkles, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -9,10 +10,19 @@ import { applyDiscount } from "@/lib/utils";
 import type { MenuCategory, MenuData } from "@/lib/data";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { ItemCard } from "@/components/public/item-card";
-import { ItemDetailDialog } from "@/components/public/item-detail-dialog";
-import { CartDrawer } from "@/components/public/cart-drawer";
 import { ShareMenu } from "@/components/public/share-menu";
 import { loadCart, saveCart, cartCount, cartTotal, cartKey, type CartItem } from "@/lib/cart";
+
+// Dynamic imports for heavy dialogs - loaded only when needed
+const ItemDetailDialog = dynamic(
+  () => import("@/components/public/item-detail-dialog").then((mod) => mod.ItemDetailDialog),
+  { ssr: false, loading: () => null }
+);
+
+const CartDrawer = dynamic(
+  () => import("@/components/public/cart-drawer").then((mod) => mod.CartDrawer),
+  { ssr: false, loading: () => null }
+);
 
 type Props = {
   dict: Dictionary;
@@ -57,17 +67,31 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
     if (slug) saveCart(slug, cart);
   }, [slug, cart]);
 
-  // عدّاد فتحات المنيو (QR visits) — مرة واحدة لكل زيارة، خارج كاش ISR
+  // عدّاد فتحات المنيو (QR visits) — مرة واحدة لكل زيارة، خارج كاش ISR.
+  // علامة sessionStorage (مطعم + يوم القاهرة) تمنع العد المتكرر مع إعادة التحميل/التنقل.
   useEffect(() => {
     if (!slug) return;
-    fetch("/api/visits", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slug }),
-      keepalive: true,
-    }).catch(() => {
-      // العدّاد غير حرج — لا نعطل تجربة العميل أبدًا
-    });
+    try {
+      const cairoDay = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Africa/Cairo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+      const key = `qr-visit-${slug}-${cairoDay}`;
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+      fetch("/api/visits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, marker: `qr-v1-${Math.random().toString(36).slice(2)}` }),
+        keepalive: true,
+      }).catch(() => {
+        // العدّاد غير حرج — لا نعطل تجربة العميل أبدًا
+      });
+    } catch {
+      // sessionStorage متاح دائمًا في المتصفح — الفشل هنا نادر وغير حرج
+    }
   }, [slug]);
 
   const addToCart = useCallback(
@@ -125,9 +149,14 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
     setCart([]);
   }, []);
 
+  // Memoized quantity lookup - O(1) instead of O(n) per call
+  const cartQtyMap = useMemo(
+    () => new Map(cart.map((i) => [i.itemId, i.qty])),
+    [cart]
+  );
   const cartQtyOf = useCallback(
-    (itemId: string) => cart.find((i) => i.itemId === itemId)?.qty ?? 0,
-    [cart],
+    (itemId: string) => cartQtyMap.get(itemId) ?? 0,
+    [cartQtyMap]
   );
 
   const [active, setActive] = useState<string | null>(categories[0]?.id ?? null);
@@ -165,6 +194,25 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
     });
     return () => observer.disconnect();
   }, [categoryKey, categories]);
+
+  // ── Centralized IntersectionObserver for CSS animations ──
+  useEffect(() => {
+    const elements = document.querySelectorAll<HTMLElement>(".animate-fade-in-up:not(.animate-visible)");
+    if (elements.length === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("animate-visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { rootMargin: "-40px", threshold: 0 },
+    );
+    elements.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [categoryKey]);
 
   const jump = useCallback(
     (id: string) => {
@@ -327,14 +375,14 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
 
           {/* ───── الأقسام والعناصر ───── */}
           <div className="container mt-14 max-w-5xl space-y-16 pb-4">
-            {categories.map((category, index) => (
+            {categories.map((category) => (
               <section
                 key={category.id}
                 ref={(el) => {
                   sectionRefs.current[category.id] = el;
                 }}
                 data-cat-id={category.id}
-                className="scroll-mt-32"
+                className="menu-section scroll-mt-32"
               >
                 <motion.div
                   className="mb-8 text-center"
@@ -357,7 +405,6 @@ export function MenuView({ dict, data, locale, slug, menuUrl }: Props) {
                       currency={currency}
                       locale={locale}
                       index={itemIndex}
-                      delay={index * 0.02}
                       themePrimary={themePrimary}
                       logoUrl={logoUrl}
                       qtyInCart={cartQtyOf(item.id)}

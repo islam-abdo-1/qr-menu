@@ -111,4 +111,33 @@
     );
     background-size: 800px 100%;
   }
+  /* ── Performance: content-visibility for off-screen sections ── */
+  .menu-section {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 500px;
+  }
+  /* ── Animations: CSS-only replacements for Framer Motion ── */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(22px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .animate-fade-in-up {
+    animation: fadeInUp 0.5s ease-out forwards;
+    opacity: 0;
+  }
+  .animate-light {
+    animation: fadeIn 0.25s ease-out forwards;
+  }
+  .animate-visible {
+    opacity: 1;
+  }
+  @media (max-width: 639px) {
+    .animate-fade-in-up {
+      animation: fadeIn 0.25s ease-out forwards;
+    }
+  }
 }

@@ -1,4 +1,4 @@
-﻿-- DayStat: إجماليات يومية لكل مطعم (مصدر التقارير)
+-- DayStat: إجماليات يومية لكل مطعم (مصدر التقارير)
 CREATE TABLE "DayStat" (
   "id" TEXT NOT NULL,
   "restaurantId" TEXT NOT NULL,

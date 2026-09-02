@@ -5,12 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { categorySchema, imageUploadSchema, menuItemSchema } from "@/lib/validations";
 import { fromZod, fail, ok, type ActionResult } from "@/lib/actions/helpers";
 import { getOwnerRestaurant } from "@/lib/data";
-import { createClient } from "@/lib/supabase/server";
+import { storageUpload, storagePublicUrl, storageDelete } from "@/lib/supabase/storage-rest";
 import { imagePathFromUrl } from "@/lib/supabase/storage";
 import { getBillingEnabled, getBillingInfo, isBillingExpired } from "@/lib/billing";
 
 const TAG = "menu";
-const BUCKET = "menu-images";
 
 function bumpMenuCache() {
   revalidateTag(TAG);
@@ -98,12 +97,11 @@ export async function deleteCategoryAction(id: string): Promise<ActionResult<nul
     if (!category || category.restaurantId !== restaurant.id) return fail("القسم غير موجود");
 
     // احذف صور العناصر التابعة
-    const supabase = createClient();
     const paths = category.items
       .map((item) => item.imageUrl)
       .filter(Boolean)
       .map((p) => imagePathFromUrl(p!));
-    if (paths.length) await supabase.storage.from(BUCKET).remove(paths);
+    if (paths.length) await storageDelete(paths);
 
     await prisma.category.delete({ where: { id } });
     bumpMenuCache();
@@ -218,8 +216,7 @@ export async function updateMenuItemAction(
     const oldImage = existing.imageUrl ? imagePathFromUrl(existing.imageUrl) : null;
     const newImage = parsed.data.imageUrl ? imagePathFromUrl(parsed.data.imageUrl) : null;
     if (oldImage && newImage && oldImage !== newImage) {
-      const supabase = createClient();
-      await supabase.storage.from(BUCKET).remove([oldImage]);
+      await storageDelete([oldImage]);
     }
 
     await prisma.menuItem.update({
@@ -256,10 +253,7 @@ export async function deleteMenuItemAction(id: string): Promise<ActionResult<nul
     if (!existing || existing.restaurantId !== restaurant.id) return fail("العنصر غير موجود");
 
     if (existing.imageUrl) {
-      const supabase = createClient();
-      await supabase.storage
-        .from(BUCKET)
-        .remove([imagePathFromUrl(existing.imageUrl)]);
+      await storageDelete([imagePathFromUrl(existing.imageUrl)]);
     }
 
     await prisma.menuItem.delete({ where: { id } });
@@ -293,9 +287,14 @@ export async function toggleItemAvailabilityAction(
 
 export async function uploadMenuItemImageAction(
   formData: FormData,
-): Promise<ActionResult<{ url: string }>> {
+): Promise<ActionResult<{ url: string; width: number; height: number; sizeKB: number }>> {
   const file = formData.get("file");
   if (!(file instanceof File)) return fail("لم يتم اختيار صورة");
+
+  // قراءة البيانات الوصفية المرسلة من العميل (عرض، ارتفاع، حجم بالكيلوبايت)
+  const width = Number(formData.get("width") ?? "0");
+  const height = Number(formData.get("height") ?? "0");
+  const sizeKB = Number(formData.get("sizeKB") ?? "0");
 
   const parsed = imageUploadSchema.safeParse({
     name: file.name,
@@ -314,21 +313,15 @@ export async function uploadMenuItemImageAction(
     const bytes = new Uint8Array(await file.arrayBuffer());
     const isWebp = file.type === "image/webp";
     const ext = isWebp ? "webp" : "jpg";
-    const path = `items/${crypto.randomUUID()}.${ext}`;
-    const supabase = createClient();
-    const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, {
-      contentType: isWebp ? "image/webp" : "image/jpeg",
-      cacheControl: "3600",
-      upsert: false,
-    });
-    if (error) {
-      console.error("[upload]", error);
-      return fail(error.message.includes("permission")
+    const path = `items/${restaurant.id}/${crypto.randomUUID()}.${ext}`;
+    const uploadResult = await storageUpload(path, bytes, isWebp ? "image/webp" : "image/jpeg");
+    if (!uploadResult.ok) {
+      console.error("[upload]", uploadResult.error);
+      return fail(uploadResult.error!.includes("permission")
         ? "لا تملك صلاحية الرفع — فعّل سياسات RLS في Storage"
         : "فشل رفع الصورة إلى التخزين");
     }
-    const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(path);
-    return ok({ url: publicData.publicUrl });
+    return ok({ url: storagePublicUrl(path), width, height, sizeKB });
   } catch (e) {
     console.error("[upload]", e);
     return fail("فشل رفع الصورة");

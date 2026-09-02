@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { hasValidSession } from "@/lib/session";
+import { getSessionCookieOptions } from "@/lib/session-cookies";
 
 /**
  * المسارات المحجوزة للنظام — تُستثنى من إعادة كتابة المستأجرين دائمًا.
@@ -15,6 +16,7 @@ const RESERVED = new Set([
   "staff",
   "m",
   "api",
+  "monitoring",
   "_next",
   "favicon.ico",
   "robots.txt",
@@ -73,12 +75,7 @@ export async function updateSession(request: NextRequest) {
         detectSessionInUrl: false,
         flowType: "pkce",
       },
-      cookieOptions: {
-        maxAge: 60 * 60 * 24 * 30, // 30 يومًا — «تذكرني» بعد إغلاق المتصفح
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-      },
+      cookieOptions: getSessionCookieOptions(60 * 60 * 24 * 30), // 30 يومًا — «تذكرني» + Secure في الإنتاج (SEC-009)
       cookies: {
         getAll() {
           return request.cookies.getAll();

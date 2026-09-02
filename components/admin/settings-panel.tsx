@@ -52,6 +52,19 @@ export function SettingsPanel({ settings, onSaved, dashboardUrl }: Props) {
   const [name, setName] = useState(settings.restaurantName);
   const [currency, setCurrency] = useState(settings.currency || "EGP");
   const [logoUrl, setLogoUrl] = useState<string | null>(settings.logoUrl || null);
+  const [logoMeta, setLogoMeta] = useState<{
+    width: number;
+    height: number;
+    sizeKB: number;
+  } | null>(
+    settings.logoWidth && settings.logoHeight && settings.logoSizeKB
+      ? {
+          width: settings.logoWidth,
+          height: settings.logoHeight,
+          sizeKB: settings.logoSizeKB,
+        }
+      : null,
+  );
   const [deliveryEnabled, setDeliveryEnabled] = useState(settings.deliveryEnabled);
   const [saving, setSaving] = useState(false);
 
@@ -62,6 +75,9 @@ export function SettingsPanel({ settings, onSaved, dashboardUrl }: Props) {
       restaurantName: name,
       currency,
       logoUrl,
+      logoWidth: logoUrl ? (logoMeta?.width ?? null) : null,
+      logoHeight: logoUrl ? (logoMeta?.height ?? null) : null,
+      logoSizeKB: logoUrl ? (logoMeta?.sizeKB ?? null) : null,
       deliveryEnabled,
     });
     setSaving(false);
@@ -126,7 +142,14 @@ export function SettingsPanel({ settings, onSaved, dashboardUrl }: Props) {
                 </p>
               </div>
             </div>
-            <ImageUploader kind="logo" value={logoUrl} onChange={setLogoUrl} />
+                        <ImageUploader
+              kind="logo"
+              value={logoUrl}
+              onChange={(url, meta) => {
+                setLogoUrl(url);
+                setLogoMeta(url ? (meta ?? null) : null);
+              }}
+            />
           </div>
 
           {/* طلبات التوصيل */}

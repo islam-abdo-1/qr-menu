@@ -39,6 +39,9 @@ export type ItemFormValue = {
   categoryId: string;
   isAvailable: boolean;
   imageUrl: string | null;
+  imageWidth?: number | null;
+  imageHeight?: number | null;
+  imageSizeKB?: number | null;
   discountPercentage: number | null;
   sizeMode: SizeMode;
   sizes: { sizeCode: string; price: string }[];
@@ -64,6 +67,19 @@ export function ItemFormDialog({ open, onOpenChange, onSaved, categories, initia
   const [isAvailable, setIsAvailable] = useState(initial?.item.isAvailable ?? true);
   const [imageUrl, setImageUrl] = useState<string | null>(
     initial?.item.imageUrl ?? null,
+  );
+  const [imageMeta, setImageMeta] = useState<{
+    width: number;
+    height: number;
+    sizeKB: number;
+  } | null>(
+    initial?.item.imageWidth && initial?.item.imageHeight && initial?.item.imageSizeKB
+      ? {
+          width: initial.item.imageWidth,
+          height: initial.item.imageHeight,
+          sizeKB: initial.item.imageSizeKB,
+        }
+      : null,
   );
 
   // خصم النسبة
@@ -167,6 +183,9 @@ export function ItemFormDialog({ open, onOpenChange, onSaved, categories, initia
       categoryId,
       isAvailable,
       imageUrl,
+      imageWidth: imageUrl ? (imageMeta?.width ?? null) : null,
+      imageHeight: imageUrl ? (imageMeta?.height ?? null) : null,
+      imageSizeKB: imageUrl ? (imageMeta?.sizeKB ?? null) : null,
       discountPercentage:
         discountEnabled && Number(discountValue) > 0 ? Number(discountValue) : null,
       sizeMode,
@@ -467,7 +486,13 @@ export function ItemFormDialog({ open, onOpenChange, onSaved, categories, initia
 
           <div className="space-y-1.5">
             <Label>صورة العنصر</Label>
-            <ImageUploader value={imageUrl} onChange={setImageUrl} />
+            <ImageUploader
+              value={imageUrl}
+              onChange={(url, meta) => {
+                setImageUrl(url);
+                setImageMeta(url ? (meta ?? null) : null);
+              }}
+            />
           </div>
 
           <DialogFooter>

@@ -1,13 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getSessionCookieOptions } from "@/lib/session-cookies";
 
-/** خيارات كوكي الجلسة الموحدة — «تذكرني»: تبقى 30 يومًا بعد إغلاق المتصفح */
-const COOKIE_OPTIONS = {
-  maxAge: 60 * 60 * 24 * 30,
-  httpOnly: true,
-  sameSite: "lax" as const,
-  path: "/",
-};
+/** خيارات كوكي الجلسة الموحدة — «تذكرني»: تبقى 30 يومًا بعد إغلاق المتصفح + Secure في الإنتاج (SEC-009) */
+const COOKIE_OPTIONS = getSessionCookieOptions(60 * 60 * 24 * 30);
 
 /**
  * Supabase client للاستخدام على الخادم (Server Actions / Route Handlers / Server Components).
@@ -48,18 +44,4 @@ export function createClient() {
       },
     },
   );
-}
-
-/**
- * المستخدم الحالي بصيغة آمنة — الاستدعاء الرسمي لكل Server Component/Page:
- * getUser() يتحقق من الجلسة عند خادم المصادقة ويجدد التوكن تلقائيًا عند انتهائه،
- * فتصل الصفحات دائمًا "مسجّلة دخول" بلا أي وميض تحميل على العميل.
- */
-export async function getCurrentUser() {
-  const supabase = createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  return { user, error, supabase };
 }

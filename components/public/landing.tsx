@@ -13,6 +13,7 @@ const T = {
   demo: "شاهد مثالًا حيًا",
   featuresTitle: "كل ما يحتاجه مطعمك",
   features: [
+    { icon: Sparkles, title: "منيو ورقي → رقمي بالـ AI", desc: "ارفع صورة أو PDF لمنيوك — الذكاء الاصطناعي يبني منيوك الرقمي كاملاً في دقائق." },
     { icon: QrCode, title: "رمز QR للطاولات", desc: "رمز جاهز للطباعة — الزبون يمسح ويفتح القائمة فورًا من موبايله." },
     { icon: BellRing, title: "استقبال الطلبات", desc: "الطلب يوصل لقسم الموظفين لحظيًا مع تنبيه صوتي وحالات متابعة." },
     { icon: Store, title: "لوحة تحكم كاملة", desc: "أضف الأقسام والعناصر والصور والأسعار والمقاسات والخصومات، حدّد الطاولات والموظفين، تابع الطلبات لحظيًا وصدر سجل عملاء التوصيل — وكل تعديل يظهر فورًا لعملائك." },
@@ -83,8 +84,9 @@ export function Landing() {
               <Rocket className="h-4 w-4" />
               {t.cta}
             </Link>
+            {/* SEC-004: زر العرض الحي دائم الظهور — يقود إلى مستأجر الديمو المعزول القراءة-فقط */}
             <Link
-              href="/m/kafy"
+              href="/m/demo"
               className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-8 py-4 text-sm font-black text-gold backdrop-blur transition-all hover:bg-gold/20 active:scale-95 sm:w-auto"
             >
               <ScanLine className="h-4 w-4" />

@@ -12,6 +12,9 @@ export type AdminItem = {
   sizeMode: "letters" | "weight";
   sizes: AdminItemSize[];
   imageUrl: string | null;
+  imageWidth: number | null;
+  imageHeight: number | null;
+  imageSizeKB: number | null;
   isAvailable: boolean;
 };
 
@@ -28,6 +31,9 @@ export type AdminSettings = {
   currency: string;
   themePrimary: string;
   logoUrl: string | null;
+  logoWidth: number | null;
+  logoHeight: number | null;
+  logoSizeKB: number | null;
   deliveryEnabled: boolean;
 };
 

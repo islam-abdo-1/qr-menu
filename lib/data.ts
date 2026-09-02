@@ -103,6 +103,7 @@ export type MenuCategory = {
     sizeMode: "letters" | "weight";
     sizes: MenuItemSize[];
     imageUrl: string | null;
+    imageBlurDataURL: string | null;
     isAvailable: boolean;
   }[];
 };
@@ -139,21 +140,13 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
               sizeMode: true,
               sizes: { select: { sizeCode: true, price: true } },
               imageUrl: true,
+              imageBlurDataURL: true,
               isAvailable: true,
             },
           },
         },
       }),
-      prisma.$queryRaw<{ itemId: string }[]>`
-        SELECT oi."itemId"
-        FROM "OrderItem" oi
-        JOIN "Order" o ON o."id" = oi."orderId"
-        WHERE o."restaurantId" = ${restaurantId} AND oi."itemId" IS NOT NULL
-          AND o."createdAt" >= ${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)}::timestamptz
-        GROUP BY oi."itemId"
-        ORDER BY SUM(oi."qty") DESC
-        LIMIT 3
-      `,
+      getBestSellers(restaurantId),
       prisma.table.findMany({
         where: { restaurantId },
         orderBy: { number: "asc" },
@@ -171,6 +164,7 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
           .filter((i) => i.isAvailable)
           .map((i) => ({
             ...i,
+            imageBlurDataURL: i.imageBlurDataURL ?? null,
             sizeMode: (i.sizeMode === "weight" ? "weight" : "letters") as "letters" | "weight",
           })),
       }))
@@ -187,7 +181,7 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
           }
         : null,
       categories: visible,
-      bestSellers: bestSellers.map((b) => b.itemId),
+      bestSellers: bestSellers,
       tables: tables.map((t) => ({ number: t.number, reserved: t.reserved })),
     };
   } catch (e) {
@@ -201,6 +195,7 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
 /**
  * منيو مطعم — بدون slug: المطعم الرئيسي (الرابط الأساسي للموقع).
  * البيانات في كاش ISR لمدة 300 ثانية (تُحدَّث فورًا من لوحة الإدارة عبر revalidateTag).
+ * Stale-while-revalidate يتم عبر PWA config (StaleWhileRevalidate handler للـ /m/*).
  */
 export const getMenuData = cache(
   async (slug?: string): Promise<MenuData | null> => {
@@ -211,6 +206,28 @@ export const getMenuData = cache(
   },
   ["qr-menu"],
   { tags: [MENU_TAG], revalidate: 300 },
+);
+
+/**
+ * Best Sellers — cached for 1 hour (changes infrequently).
+ * Separate cache key to avoid invalidating full menu when best sellers update.
+ */
+export const getBestSellers = cache(
+  async (restaurantId: string): Promise<string[]> => {
+    const bestSellers = await prisma.$queryRaw<{ itemId: string }[]>`
+      SELECT oi."itemId"
+      FROM "OrderItem" oi
+      JOIN "Order" o ON o."id" = oi."orderId"
+      WHERE o."restaurantId" = ${restaurantId} AND oi."itemId" IS NOT NULL
+        AND o."createdAt" >= ${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)}::timestamptz
+      GROUP BY oi."itemId"
+      ORDER BY SUM(oi."qty") DESC
+      LIMIT 3
+    `;
+    return bestSellers.map((b) => b.itemId);
+  },
+  ["qr-menu-best-sellers"],
+  { tags: [MENU_TAG], revalidate: 3600 }, // 1 hour
 );
 
 /** استعلام المطعم نفسه بكاش قصير — id و slug ثابتان، والتغييرات تُمسح عبر OWNER_TAG */
@@ -249,68 +266,88 @@ export async function getOwnerRestaurant() {
   return cachedOwner(userId);
 }
 
-/** بيانات حيّة (بدون كاش) — داخل لوحة الإدارة فقط، مقيدة بمطعم المالك */
+/** بيانات لوحة الإدارة — مع كاش 60s + إبطال فوري عبر OWNER_TAG */
+const getAdminDataCached = cache(
+  async (restaurantId: string) => {
+    const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
+    if (!restaurant) return null;
+
+    const billingEnabled = await getBillingEnabled();
+    const billing = getBillingInfo(restaurant, billingEnabled);
+
+    const [settings, categories] = await Promise.all([
+      prisma.setting.findUnique({ where: { restaurantId } }),
+      prisma.category.findMany({
+        where: { restaurantId },
+        orderBy: { sortOrder: "asc" },
+include: {
+          items: {
+            orderBy: { createdAt: "asc" },
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              price: true,
+              discountPercentage: true,
+              sizeMode: true,
+              sizes: { select: { sizeCode: true, price: true } },
+              imageUrl: true,
+              imageWidth: true,
+              imageHeight: true,
+              imageSizeKB: true,
+              isAvailable: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      restaurant: {
+        id: restaurant.id,
+        slug: restaurant.slug,
+        staffPin: restaurant.staffPin || null,
+        blocked: restaurant.blocked,
+        trialEndsAt: restaurant.trialEndsAt,
+        paidUntil: restaurant.paidUntil,
+        billingExempt: restaurant.billingExempt,
+      },
+      billingEnabled,
+      billingStatus: billing.status,
+      trialDaysLeft: trialDaysLeft(billing.trialEndsAt),
+      settings: settings
+        ? {
+            id: settings.id,
+            restaurantName: settings.restaurantName,
+            currency: settings.currency,
+            themePrimary: settings.themePrimary,
+            logoUrl: settings.logoUrl || null,
+            logoWidth: settings.logoWidth ?? null,
+            logoHeight: settings.logoHeight ?? null,
+            logoSizeKB: settings.logoSizeKB ?? null,
+            deliveryEnabled: settings.deliveryEnabled,
+          }
+        : { id: 0, restaurantName: "", currency: "EGP", themePrimary: "#C84C21", logoUrl: null, logoWidth: null, logoHeight: null, logoSizeKB: null, deliveryEnabled: true },
+      // prisma يعيد sizeMode نصًا — نضيّقه إلى الوضعين المسموحين
+      categories: categories.map((c) => ({
+        ...c,
+        items: c.items.map((i) => ({
+          ...i,
+          sizeMode: (i.sizeMode === "weight" ? "weight" : "letters") as "letters" | "weight",
+          imageWidth: i.imageWidth ?? null,
+          imageHeight: i.imageHeight ?? null,
+          imageSizeKB: i.imageSizeKB ?? null,
+        })),
+      })),
+    };
+  },
+  ["admin-data"],
+  { tags: [OWNER_TAG], revalidate: 60 }
+);
+
+/** بيانات لوحة الإدارة — مع كاش 60s + إبطال فوري عبر OWNER_TAG */
 export async function getAdminData() {
   const restaurant = await getOwnerRestaurant();
   if (!restaurant) return null;
-
-  const billingEnabled = await getBillingEnabled();
-  const billing = getBillingInfo(restaurant, billingEnabled);
-
-  const [settings, categories] = await Promise.all([
-    prisma.setting.findUnique({ where: { restaurantId: restaurant.id } }),
-    prisma.category.findMany({
-      where: { restaurantId: restaurant.id },
-      orderBy: { sortOrder: "asc" },
-      include: {
-        items: {
-          orderBy: { createdAt: "asc" },
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            price: true,
-            discountPercentage: true,
-            sizeMode: true,
-            sizes: { select: { sizeCode: true, price: true } },
-            imageUrl: true,
-            isAvailable: true,
-          },
-        },
-      },
-    }),
-  ]);
-
-  return {
-    restaurant: {
-      id: restaurant.id,
-      slug: restaurant.slug,
-      staffPin: restaurant.staffPin || null,
-      blocked: restaurant.blocked,
-      trialEndsAt: restaurant.trialEndsAt,
-      paidUntil: restaurant.paidUntil,
-      billingExempt: restaurant.billingExempt,
-    },
-    billingEnabled,
-    billingStatus: billing.status,
-    trialDaysLeft: trialDaysLeft(billing.trialEndsAt),
-    settings: settings
-      ? {
-          id: settings.id,
-          restaurantName: settings.restaurantName,
-          currency: settings.currency,
-          themePrimary: settings.themePrimary,
-          logoUrl: settings.logoUrl || null,
-          deliveryEnabled: settings.deliveryEnabled,
-        }
-      : { id: 0, restaurantName: "", currency: "EGP", themePrimary: "#C84C21", logoUrl: null, deliveryEnabled: true },
-    // prisma يعيد sizeMode نصًا — نضيّقه إلى الوضعين المسموحين
-    categories: categories.map((c) => ({
-      ...c,
-      items: c.items.map((i) => ({
-        ...i,
-        sizeMode: (i.sizeMode === "weight" ? "weight" : "letters") as "letters" | "weight",
-      })),
-    })),
-  };
+  return getAdminDataCached(restaurant.id);
 }

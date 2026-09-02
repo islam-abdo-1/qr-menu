@@ -115,7 +115,7 @@ export function SignupForm({ signupOpen }: { signupOpen: boolean }) {
           <div>
             <h1 className="font-display text-3xl font-bold text-gold-gradient">أنشئ مطعمك مجانًا</h1>
             <p className="mt-1.5 text-sm text-cream/75">
-              أول أسبوع مجاني بالكامل — ثم 250 ج.م شهريًا أو 2,300 ج.م سنويًا
+              جرّب مطعمك مجانًا لمدة 7 أيام
             </p>
           </div>
         </div>

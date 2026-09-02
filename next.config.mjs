@@ -1,10 +1,13 @@
 import withPWAInit from "@ducanh2912/next-pwa";
+import { withSentryConfig } from "@sentry/nextjs";
 
 /**
- * PWA — استراتيجية كاش صارمة:
- *  - الاستاتيك والصور (Supabase Storage): Cache First → تقليل باندودث التخزين.
- *  - صفحة HTML والـ API: Network First — الأدمن يرى البيانات الحية دائمًا.
- *  - POST/PUT/DELETE: لا تدخل أي قاعدة (workbox يطابق GET فقط) → شبكة مباشرة.
+ * PWA — استراتيجية كاش هجينة محسّنة للأداء:
+ *  - صفحات المنيو العامة (/m/*): StaleWhileRevalidate → عرض فوري من الكاش + تحديث في الخلفية
+ *  - لوحات محمية (/admin/*, /staff/*): NetworkOnly — بلا كاش، بيانات حية دائماً
+ *  - API (GET): StaleWhileRevalidate مع timeout 3 ثوانٍ — سرعة + بيانات حديثة
+ *  - الاستاتيك والصور: Cache First → تقليل باندودث
+ *  - POST/PUT/DELETE: شبكة مباشرة (workbox يطابق GET فقط)
  */
 const withPWA = withPWAInit({
   dest: "public",
@@ -15,25 +18,42 @@ const withPWA = withPWAInit({
     cleanupOutdatedCaches: true,
     navigateFallback: null,
     runtimeCaching: [
-      // الصفحات (HTML) — Network First: الجلسة والمحتوى دائمًا أحدث ما في الخادم
+      // لوحات محمية (أدمن/موظفون) — بلا كاش إطلاقًا
+      {
+        urlPattern: ({ url, request }) =>
+          request.mode === "navigate" &&
+          (url.pathname.startsWith("/admin") || url.pathname.startsWith("/staff")),
+        handler: "NetworkOnly",
+      },
+      // صفحات المنيو العامة (/m/*) — StaleWhileRevalidate: فوري من الكاش + تحديث صامت
+      {
+        urlPattern: ({ url, request }) =>
+          request.mode === "navigate" && url.pathname.startsWith("/m/"),
+        handler: "StaleWhileRevalidate",
+        options: {
+          cacheName: "menu-pages",
+          expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 },
+        },
+      },
+      // باقي الصفحات العامة (الرئيسية، login، signup...) — NetworkFirst مع timeout مخفض
       {
         urlPattern: ({ request }) => request.mode === "navigate",
         handler: "NetworkFirst",
         options: {
           cacheName: "pages",
-          networkTimeoutSeconds: 5,
+          networkTimeoutSeconds: 2,
           expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 },
         },
       },
-      // الـ API (GET) — Network First بلا خلط (التخزين المؤقت احتياطي فقط)
+      // الـ API (GET) — StaleWhileRevalidate مع timeout 3 ثوانٍ
       {
         urlPattern: /^\/api\/.*/,
-        handler: "NetworkFirst",
+        handler: "StaleWhileRevalidate",
         method: "GET",
         options: {
-          cacheName: "api",
-          networkTimeoutSeconds: 5,
-          expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 },
+          cacheName: "api-get",
+          networkTimeoutSeconds: 3,
+          expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 },
         },
       },
       // إحصائيات البناء (webpack) — Cache First مع مدة سنة
@@ -68,6 +88,7 @@ const withPWA = withPWAInit({
 });
 
 /** ترويسات أمان موحّدة لكل المسارات */
+const isDev = process.env.NODE_ENV === "development";
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -81,7 +102,7 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://*.supabase.co",
       "connect-src 'self' https://*.supabase.co https://checkout.paymob.com",
@@ -122,4 +143,15 @@ const nextConfig = {
   },
 };
 
-export default withPWA(nextConfig);
+export default withSentryConfig(withPWA(nextConfig), {
+  org: "qr-menu-o1",
+  project: "javascript-nextjs",
+  silent: true,
+  disableLogger: true,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  widenClientFileUpload: true,
+  tunnelRoute: "/monitoring",
+  hideSourceMaps: true,
+  disableLogger: true,
+  automaticVercelMonitors: true,
+});
