@@ -3,6 +3,7 @@
 generator client {
   provider       = "prisma-client-js"
   driverAdapters = true // يعمل على runtime Workers (Cloudflare Pages) عبر adapter-pg
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -33,7 +34,8 @@ model Restaurant {
   dayStats   DayStat[]
   staff      Staff[]
   payments  Payment[]
-  aiMenuJobs AiMenuImportJob[]
+
+  @@index([ownerId])
 }
 
 /// إعداد عام للمنصة (key/value) — يُعدَّل من تطبيق لوحة المالك بلا إعادة نشر
@@ -168,6 +170,7 @@ model Order {
   // POSTGRES يسمح بتعدد القيم NULL — الطلبات بلا nonce (المسار القديم) لا تتقيد أبدًا
   @@unique([restaurantId, cartNonce])
   @@index([restaurantId, createdAt(sort: Desc)])
+  @@index([restaurantId, status, createdAt(sort: Desc)])
 }
 
 /// عدّاد صارم لطلبات المطعم خلال نافذة زمنية — يُحدَّث ذريًا (row-lock) لمنع تجاوز الحد بالإرسال المتوازي
@@ -232,121 +235,12 @@ model OrderItem {
   @@index([itemId, orderId])
 }
 
-// ═══════════════ AI MENU BUILDER ═══════════════
 
-/// طلب استيراد منيو بالذكاء الاصطناعي — دورة حياة كاملة من الرفع حتى التنظيف
-model AiMenuImportJob {
-  id                    String    @id @default(cuid())
-  restaurantId          String
-  restaurant            Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  status                String    @default("UPLOADED") // UPLOADED | ANALYZING | WAITING_REVIEW | GENERATING | COMPLETED | FAILED | CLEANED
-  sourceType            String    // pdf | images
-  sourceFileCount       Int       @default(0)
-  sourcePageCount       Int       @default(0)
-  tempFiles             Json?     // [{path}] مسارات التخزين المؤقت
-  geminiFiles           Json?     // [{name,uri}] مراجع Gemini Files API
-  detectedCategoryCount Int       @default(0)
-  detectedItemCount     Int       @default(0)
-  extractedImageCount   Int       @default(0)
-  generatedImageCount   Int       @default(0)
-  failedImageCount      Int       @default(0)
-  imageMode             String    @default("SMART") // SMART | MENU_ONLY | AI_ONLY
-  currency              String    @default("EGP")
-  errorMessage          String?
-  providerUsed          String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  completedAt           DateTime?
-  expiresAt             DateTime
-  items                 AiMenuImportItem[]
 
-  @@index([restaurantId])
-  @@index([status, expiresAt])
-}
 
-/// صنف مستخرج بالـ AI — يخضع للمراجعة قبل الاستيراد للمنيو الحقيقي
-model AiMenuImportItem {
-  id                 String   @id @default(cuid())
-  jobId              String
-  job                AiMenuImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  restaurantId       String
-  categoryName       String
-  categoryType       String?
-  categoryOrder      Int      @default(0)
-  name               String
-  description        String?
-  price              Float?
-  currency           String?
-  sizeMode           String   @default("letters")
-  variants           Json?    // [{name, price}]
-  needsReview        Boolean  @default(false)
-  reviewReasons      Json?
-  priceConfidence    Float?
-  categoryConfidence Float?
-  imageDetected      Boolean  @default(false)
-  imageSource        String   @default("NONE") // NONE | MENU_ORIGINAL | AI_GENERATED | PLACEHOLDER
-  imageConfidence    Float?
-  imagePage          Int?
-  imageRegion        Json?    // {x,y,w,h} نسب طبيعية 0-1
-  tempImagePath      String?  // الصورة المقصوصة المؤقتة
-  finalImageUrl      String?
-  finalImageMeta     Json?    // {width,height,sizeKB,blurDataURL}
-  generationStatus   String?  // PENDING | PROCESSING | COMPLETED | FAILED | SKIPPED
-  generationError    String?
-  imageModeOverride  String?  // original | generate | none (تجاوز لكل صنف)
-  sourcePage         Int?
-  sourceOrder        Int      @default(0)
-  importedMenuItemId String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
 
-  @@index([jobId])
-  @@index([restaurantId])
-}
 
-/// قالب نمط بصري مركزي — يُشارك بين كل المطاعم (لا ازدواجية)
-model AiMenuStyle {
-  id           String   @id @default(cuid())
-  name         String
-  slug         String   @unique
-  description  String?
-  categoryType String
-  styleConfig  Json
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  references   AiMenuStyleReference[]
-}
 
-/// صورة مرجعية (Pinterest) مرتبطة بقالب نمط — إلهام بصري للـ AI
-model AiMenuStyleReference {
-  id          String   @id @default(cuid())
-  styleId     String
-  style       AiMenuStyle @relation(fields: [styleId], references: [id], onDelete: Cascade)
-  storagePath String
-  metadata    Json?
-  createdAt   DateTime @default(now())
 
-  @@index([styleId])
-}
 
-/// سجل كل استدعاء AI — أساس لوحة مراقبة الاستهلاك في لوحة المالك
-model AiUsageLog {
-  id             String   @id @default(cuid())
-  createdAt      DateTime @default(now())
-  restaurantId   String?
-  jobId          String?
-  requestType    String   // menu_analysis | image_gen
-  provider       String   // gemini | openrouter
-  model          String
-  keyFingerprint String?  // آخر 4 حروف فقط — لا يُكشف المفتاح
-  status         String   // ok | quota_exceeded | error
-  inputTokens    Int      @default(0)
-  outputTokens   Int      @default(0)
-  totalTokens    Int      @default(0)
-  durationMs     Int      @default(0)
-  errorMessage   String?
 
-  @@index([createdAt])
-  @@index([restaurantId, createdAt])
-}

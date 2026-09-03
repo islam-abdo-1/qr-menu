@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { CheckCircle2, Loader2, Lock, Mail, ShieldCheck, Store, Ban } from "lucide-react";
 import { registerRestaurantAction } from "@/lib/actions/auth";
+import { TurnstileWidget } from "@/components/auth/turnstile-widget";
 import { cn } from "@/lib/utils";
 
 export function SignupForm({ signupOpen }: { signupOpen: boolean }) {
@@ -15,13 +16,17 @@ export function SignupForm({ signupOpen }: { signupOpen: boolean }) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setFieldErrors(null);
     setLoading(true);
-    const res = await registerRestaurantAction({ restaurantName: name, email, password });
+    const res = await registerRestaurantAction(
+      { restaurantName: name, email, password },
+      turnstileToken || undefined
+    );
     if (res.ok) {
       setDone(res.data.slug);
     } else {
@@ -202,6 +207,14 @@ export function SignupForm({ signupOpen }: { signupOpen: boolean }) {
               {error}
             </motion.p>
           )}
+
+          {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? (
+            <TurnstileWidget
+              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+              onVerify={setTurnstileToken}
+              onExpire={() => setTurnstileToken(null)}
+            />
+          ) : null}
 
           <button
             type="submit"

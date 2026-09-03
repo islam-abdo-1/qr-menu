@@ -8,15 +8,23 @@ import { ActionResult, fail, fromZod, ok } from "@/lib/actions/helpers";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { generateUniqueStaffPin } from "@/lib/staff-pin";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 export async function signInAction(
   email: string,
   password: string,
+  turnstileToken?: string,
 ): Promise<ActionResult<null>> {
   const parsed = credentialsSchema.safeParse({ email, password });
   if (!parsed.success) {
     const { error, fieldErrors } = fromZod(parsed.error);
     return fail(error, fieldErrors);
+  }
+
+  // Verify Turnstile token
+  const turnstileOk = await verifyTurnstile(turnstileToken);
+  if (!turnstileOk) {
+    return fail("فشل التحقق من الأمان — حاول مجددًا");
   }
 
   const { NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY } = process.env;
@@ -105,14 +113,23 @@ export async function requestPasswordResetAction(
 
 /* ───────────────────────── تسجيل مطعم جديد ───────────────────────── */
 
-/** إعدادات المنصة العامة (حد المطاعم + فتح/إغلاق التسجيل) — تُعدَّل من لوحة المالك */
+let siteSettingsCache: { signupOpen: boolean; maxRestaurants: number } | null = null;
+let siteSettingsCacheTime = 0;
+
 async function getSiteSettings() {
+  const now = Date.now();
+  // كاش لمدة 5 دقائق للإعدادات
+  if (siteSettingsCache && now - siteSettingsCacheTime < 5 * 60 * 1000) {
+    return siteSettingsCache;
+  }
   const rows = await prisma.siteSetting.findMany();
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-  return {
+  siteSettingsCache = {
     signupOpen: map.signupOpen !== "false",
     maxRestaurants: Math.max(1, Number.parseInt(map.maxRestaurants ?? "25", 10) || 25),
   };
+  siteSettingsCacheTime = now;
+  return siteSettingsCache;
 }
 
 /** مطعم المالك من الجلسة — تُستخدم في لوحة الإدارة وكل إجراءات التعديل */
@@ -189,11 +206,18 @@ async function uniqueSlug(name: string): Promise<string> {
 
 export async function registerRestaurantAction(
   input: z.infer<typeof signupSchema>,
+  turnstileToken?: string,
 ): Promise<ActionResult<{ slug: string }>> {
   const parsed = signupSchema.safeParse(input);
   if (!parsed.success) {
     const { error, fieldErrors } = fromZod(parsed.error);
     return fail(error, fieldErrors);
+  }
+
+  // Verify Turnstile token
+  const turnstileOk = await verifyTurnstile(turnstileToken);
+  if (!turnstileOk) {
+    return fail("فشل التحقق من الأمان — حاول مجددًا");
   }
 
   try {

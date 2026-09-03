@@ -102,11 +102,11 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://challenges.cloudflare.com https://www.googletagmanager.com https://www.google-analytics.com`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://*.supabase.co",
-      "connect-src 'self' https://*.supabase.co https://checkout.paymob.com",
-      "frame-src https://checkout.paymob.com",
+      "img-src 'self' data: blob: https://*.supabase.co https://www.google-analytics.com https://www.googletagmanager.com",
+      "connect-src 'self' https://*.supabase.co https://checkout.paymob.com https://challenges.cloudflare.com https://www.google-analytics.com https://region1.google-analytics.com",
+      "frame-src https://checkout.paymob.com https://challenges.cloudflare.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -133,6 +133,8 @@ const nextConfig = {
   poweredByHeader: false,
   // ضغط gzip/brotli لبايتات الاستجابة (Vercel serverless يدعمه)
   compress: true,
+  // استبعاد مجلد scripts من الـ build
+  pageExtensions: ['ts', 'tsx', 'js', 'jsx'],
   experimental: {
     // مكتبات Node لا تُدخلها webpack في الحزمة — تُحمَّل من node_modules
     serverComponentsExternalPackages: [
@@ -140,6 +142,17 @@ const nextConfig = {
       "@prisma/adapter-pg",
       "pg",
     ],
+    staleTimes: {
+      dynamic: 300,        // 5 دقائق للمحتوى الديناميكي
+      static: 3600,        // ساعة للمحتوى الستاتيكي
+    },
+  },
+  webpack: (config) => {
+    config.module.rules.push({
+      test: /scripts\/.*\.ts$/,
+      use: 'ignore-loader',
+    });
+    return config;
   },
 };
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { ScanLine, ShoppingBag, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -235,9 +236,11 @@ export function MenuSections({ dict, data, locale, slug, menuUrl }: Props) {
         <div className="mx-auto flex max-w-4xl items-center gap-2 rounded-2xl border border-gold/20 bg-[#191310]/90 py-2 ps-4 pe-2 shadow-elevated backdrop-blur-xl">
           <span className="hidden shrink-0 items-center gap-2 text-sm font-black text-cream md:flex">
             {logoUrl ? (
-              <img
+              <Image
                 src={logoUrl}
                 alt={restaurantName}
+                width={28}
+                height={28}
                 className="h-7 w-7 rounded-lg object-cover ring-1 ring-gold/40"
               />
             ) : (
@@ -407,7 +410,7 @@ export function MenuSections({ dict, data, locale, slug, menuUrl }: Props) {
           <div className="container flex flex-col items-center gap-4">
             {logoUrl ? (
               <div className="relative h-16 w-16 overflow-hidden rounded-full border-2 border-gold/70 bg-[#0D0A08] shadow-[0_0_30px_-6px_rgba(212,168,83,0.5)]">
-                <img src={logoUrl} alt={restaurantName} className="h-full w-full object-cover" />
+                <Image src={logoUrl} alt={restaurantName} fill className="object-cover" sizes="64px" />
               </div>
             ) : (
               <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-gold/30 bg-gold/10 text-gold">

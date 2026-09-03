@@ -205,7 +205,7 @@ export const getMenuData = cache(
     return restaurant ? loadRestaurant(restaurant.id) : null;
   },
   ["qr-menu"],
-  { tags: [MENU_TAG], revalidate: 300 },
+  { tags: [MENU_TAG], revalidate: 30 },
 );
 
 /**
@@ -227,7 +227,7 @@ export const getBestSellers = cache(
     return bestSellers.map((b) => b.itemId);
   },
   ["qr-menu-best-sellers"],
-  { tags: [MENU_TAG], revalidate: 3600 }, // 1 hour
+  { tags: [MENU_TAG], revalidate: 300 },
 );
 
 /** استعلام المطعم نفسه بكاش قصير — id و slug ثابتان، والتغييرات تُمسح عبر OWNER_TAG */
@@ -266,7 +266,7 @@ export async function getOwnerRestaurant() {
   return cachedOwner(userId);
 }
 
-/** بيانات لوحة الإدارة — مع كاش 60s + إبطال فوري عبر OWNER_TAG */
+/** بيانات لوحة الإدارة — مع كاش 30s + إبطال فوري عبر OWNER_TAG */
 const getAdminDataCached = cache(
   async (restaurantId: string) => {
     const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
@@ -280,7 +280,7 @@ const getAdminDataCached = cache(
       prisma.category.findMany({
         where: { restaurantId },
         orderBy: { sortOrder: "asc" },
-include: {
+        include: {
           items: {
             orderBy: { createdAt: "asc" },
             select: {
@@ -328,7 +328,6 @@ include: {
             deliveryEnabled: settings.deliveryEnabled,
           }
         : { id: 0, restaurantName: "", currency: "EGP", themePrimary: "#C84C21", logoUrl: null, logoWidth: null, logoHeight: null, logoSizeKB: null, deliveryEnabled: true },
-      // prisma يعيد sizeMode نصًا — نضيّقه إلى الوضعين المسموحين
       categories: categories.map((c) => ({
         ...c,
         items: c.items.map((i) => ({
@@ -342,7 +341,7 @@ include: {
     };
   },
   ["admin-data"],
-  { tags: [OWNER_TAG], revalidate: 60 }
+  { tags: [OWNER_TAG], revalidate: 30 }
 );
 
 /** بيانات لوحة الإدارة — مع كاش 60s + إبطال فوري عبر OWNER_TAG */

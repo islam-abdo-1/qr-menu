@@ -14,7 +14,6 @@ import {
   QrCode,
   Settings,
   ShoppingBag,
-  Sparkles,
   Table2,
   Tags,
   Users,
@@ -29,7 +28,6 @@ import { ItemsPanel } from "@/components/admin/items-panel";
 import { CategoriesPanel } from "@/components/admin/categories-panel";
 import { SettingsPanel } from "@/components/admin/settings-panel";
 import { QrPanel } from "@/components/admin/qr-panel";
-import { AiMenuPanel } from "@/components/admin/ai-menu/ai-menu-panel";
 import { OrdersPanel } from "@/components/admin/orders-panel";
 import { ReportsPanel } from "@/components/admin/reports-panel";
 import { TablesPanel } from "@/components/admin/tables-panel";
@@ -40,7 +38,6 @@ import type { AdminData } from "@/components/admin/types";
 
 type Tab =
   | "orders"
-  | "ai-import"
   | "items"
   | "categories"
   | "settings"
@@ -52,7 +49,6 @@ type Tab =
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "orders", label: "الطلبات", icon: ClipboardList },
-  { id: "ai-import", label: "المستورد الذكي", icon: Sparkles },
   { id: "reports", label: "التقارير", icon: BarChart3 },
   { id: "items", label: "العناصر", icon: ShoppingBag },
   { id: "categories", label: "الأقسام", icon: Tags },
@@ -318,13 +314,6 @@ export function AdminShell({ data }: { data: AdminData }) {
             />
           )}
           {tab === "billing" && <BillingPanel data={data} />}
-          {tab === "ai-import" && (
-            <AiMenuPanel
-              restaurantId={data.restaurant.id}
-              currency={data.settings.currency || "EGP"}
-              onChanged={onChanged}
-            />
-          )}
           {tab === "qr" && <QrPanel restaurantName={data.settings.restaurantName} menuUrl={menuUrl} />}
         </div>
       </main>

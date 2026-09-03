@@ -64,7 +64,7 @@ async function loadOrders(restaurantId: string): Promise<OrderView[]> {
         items: { select: { id: true, name: true, price: true, qty: true, sizeCode: true, itemId: true } },
       },
       orderBy: { createdAt: "desc" },
-      take: 500,
+      take: 50,
     }),
   ]);
 

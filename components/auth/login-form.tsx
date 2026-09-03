@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
 import { signInAction } from "@/lib/actions/auth";
+import { TurnstileWidget } from "@/components/auth/turnstile-widget";
 import { cn } from "@/lib/utils";
 
 export function LoginForm({ next }: { next?: string }) {
@@ -15,15 +16,15 @@ export function LoginForm({ next }: { next?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setFieldErrors(null);
     setLoading(true);
-    const res = await signInAction(email, password);
+    const res = await signInAction(email, password, turnstileToken || undefined);
     if (res.ok) {
-      // العودة إلى الصفحة التي كان يحاول الوصول إليها (من ?next) وليس /admin دائمًا
       router.push(next ?? "/admin");
       router.refresh();
     } else {
@@ -131,6 +132,14 @@ export function LoginForm({ next }: { next?: string }) {
               {error}
             </motion.p>
           )}
+
+          {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? (
+            <TurnstileWidget
+              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+              onVerify={setTurnstileToken}
+              onExpire={() => setTurnstileToken(null)}
+            />
+          ) : null}
 
           <button
             type="submit"

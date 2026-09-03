@@ -22,7 +22,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createClient(): PrismaClient {
-  const poolSize = Number.parseInt(process.env.PRISMA_POOL_SIZE ?? "2", 10);
+  const poolSize = Number.parseInt(process.env.PRISMA_POOL_SIZE ?? "20", 10);
   const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL!,
     max: poolSize,

@@ -3,6 +3,7 @@ import { Amiri, Cairo } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { PwaInstallBanner } from "@/components/pwa/install-banner";
 import { RegisterPWA } from "@/components/pwa/register-sw";
+import Script from "next/script";
 import "./globals.css";
 
 export const revalidate = 300;
@@ -59,6 +60,29 @@ export default function RootLayout({
       dir="rtl"
       className={`${cairo.variable} ${amiri.variable}`}
     >
+      <head>
+        <Script
+          strategy="afterInteractive"
+          src="https://www.googletagmanager.com/gtag/js?id=G-N9PRRDXKS4"
+        />
+        <Script
+          id="google-analytics"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-N9PRRDXKS4');
+            `,
+          }}
+        />
+        <Script
+          id="turnstile"
+          strategy="afterInteractive"
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+        />
+      </head>
       <body className="min-h-screen">
         {children}
         <Toaster position="top-center" richColors />
