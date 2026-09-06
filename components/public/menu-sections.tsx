@@ -8,6 +8,7 @@ import { ScanLine, ShoppingBag, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
 import { applyDiscount } from "@/lib/utils";
+import { toImageProxyUrl } from "@/lib/utils";
 import type { MenuCategory, MenuData } from "@/lib/data";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { ItemCard } from "@/components/public/item-card";
@@ -237,11 +238,12 @@ export function MenuSections({ dict, data, locale, slug, menuUrl }: Props) {
           <span className="hidden shrink-0 items-center gap-2 text-sm font-black text-cream md:flex">
             {logoUrl ? (
               <Image
-                src={logoUrl}
+                src={toImageProxyUrl(logoUrl, { width: 28, height: 28, quality: 80 }) || logoUrl}
                 alt={restaurantName}
                 width={28}
                 height={28}
                 className="h-7 w-7 rounded-lg object-cover ring-1 ring-gold/40"
+                unoptimized
               />
             ) : (
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-gold to-[#a87a2b] text-background">
@@ -410,7 +412,14 @@ export function MenuSections({ dict, data, locale, slug, menuUrl }: Props) {
           <div className="container flex flex-col items-center gap-4">
             {logoUrl ? (
               <div className="relative h-16 w-16 overflow-hidden rounded-full border-2 border-gold/70 bg-[#0D0A08] shadow-[0_0_30px_-6px_rgba(212,168,83,0.5)]">
-                <Image src={logoUrl} alt={restaurantName} fill className="object-cover" sizes="64px" />
+                <Image 
+                  src={toImageProxyUrl(logoUrl, { width: 64, height: 64, quality: 80 }) || logoUrl} 
+                  alt={restaurantName} 
+                  fill 
+                  className="object-cover" 
+                  sizes="64px"
+                  unoptimized
+                />
               </div>
             ) : (
               <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-gold/30 bg-gold/10 text-gold">

@@ -45,6 +45,22 @@ export function publicImageUrl(path: string) {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/menu-images/${path}`;
 }
 
+/** تحويل رابط Supabase Storage إلى رابط Image Proxy للتخزين المؤقت والتحسين */
+export function toImageProxyUrl(url: string | null | undefined, options?: { width?: number; height?: number; quality?: number; format?: 'webp' | 'jpeg' | 'png' | 'avif' }): string | undefined {
+  if (!url) return undefined;
+  // إذا كان الرابط بالفعل proxied أو ليس من Supabase، أرجعه كما هو
+  if (url.startsWith('/api/image') || !url.includes('supabase')) return url;
+  
+  const params = new URLSearchParams();
+  params.set('url', url);
+  if (options?.width) params.set('w', String(options.width));
+  if (options?.height) params.set('h', String(options.height));
+  if (options?.quality) params.set('q', String(options.quality));
+  if (options?.format) params.set('f', options.format);
+  
+  return `/api/image?${params.toString()}`;
+}
+
 /**
  * تطبيق خصم نسبة على سعر — نقطة الحساب الوحيدة في النظام:
  * finalPrice = base - (base * discountPercentage / 100)

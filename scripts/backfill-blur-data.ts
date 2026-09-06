@@ -2,7 +2,20 @@ require('dotenv').config({ path: '.env.local' });
 const { PrismaClient } = require('@prisma/client');
 const sharp = require('sharp');
 
-const prisma = new PrismaClient();
+// Use DIRECT_URL for local script execution (bypasses pgbouncer)
+const directUrl = process.env.DIRECT_URL;
+if (!directUrl) {
+  console.error('DIRECT_URL not found in .env.local');
+  process.exit(1);
+}
+
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: directUrl
+    }
+  }
+});
 
 async function generateBlurDataURL(imageUrl: string) {
   try {

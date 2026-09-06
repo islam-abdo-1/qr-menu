@@ -61,6 +61,12 @@ export default function RootLayout({
       className={`${cairo.variable} ${amiri.variable}`}
     >
       <head>
+        {/* Prefetch critical routes for faster navigation */}
+        <link rel="prefetch" href="/login" as="document" />
+        <link rel="prefetch" href="/signup" as="document" />
+        <link rel="prefetch" href="/admin" as="document" />
+        <link rel="prefetch" href="/staff" as="document" />
+        
         <Script
           strategy="afterInteractive"
           src="https://www.googletagmanager.com/gtag/js?id=G-N9PRRDXKS4"

@@ -176,7 +176,7 @@ const SECURITY_HEADERS = {
     "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://www.googletagmanager.com https://www.google-analytics.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://*.supabase.co https://www.google-analytics.com https://www.googletagmanager.com",
-    "connect-src 'self' https://*.supabase.co https://checkout.paymob.com https://challenges.cloudflare.com https://www.google-analytics.com https://region1.google-analytics.com",
+    "connect-src 'self' https://*.supabase.co https://checkout.paymob.com https://challenges.cloudflare.com https://www.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com",
     "frame-src https://checkout.paymob.com https://challenges.cloudflare.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",

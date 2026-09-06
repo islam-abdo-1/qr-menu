@@ -140,7 +140,6 @@ export function ImageUploader({ value, onChange, kind = "item" }: Props) {
               fill
               sizes="80px"
               className="object-cover"
-              unoptimized
             />
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">

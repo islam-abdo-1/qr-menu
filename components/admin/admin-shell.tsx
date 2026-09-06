@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { toImageProxyUrl } from "@/lib/utils";
 import { signOutAction } from "@/lib/actions/auth";
 import { getOrdersAction, type OrderView } from "@/lib/actions/orders";
 import { playOrderBeep, flashTitle } from "@/lib/notify";
@@ -166,12 +167,11 @@ export function AdminShell({ data }: { data: AdminData }) {
             {data.settings.logoUrl ? (
               <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl ring-2 ring-gold/60 ring-offset-2 ring-offset-[#171310]">
                 <Image
-                  src={data.settings.logoUrl}
+                  src={toImageProxyUrl(data.settings.logoUrl, { width: 44, height: 44, quality: 80 }) || data.settings.logoUrl}
                   alt="شعار المطعم"
                   fill
                   sizes="44px"
                   className="object-cover"
-                  unoptimized
                 />
               </div>
             ) : (

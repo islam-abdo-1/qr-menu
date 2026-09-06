@@ -93,17 +93,17 @@ export function ItemCard({
       tabIndex={onOpenDetails ? 0 : undefined}
       aria-label={onOpenDetails ? (locale === "ar" ? `عرض تفاصيل ${item.name}` : `View details for ${item.name}`) : undefined}
     >
-      {/* الصورة */}
+      {/* الصورة — عبر Image Proxy للتخزين المؤقت والتحسين */}
       <div className="relative aspect-[4/3] w-full overflow-hidden">
         {item.imageUrl ? (
           <Image
-            src={item.imageUrl}
+            src={`/api/image?url=${encodeURIComponent(item.imageUrl)}&w=400&q=75`}
             alt={item.name}
             fill
             sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 25vw"
             loading={index < 6 ? "eager" : "lazy"}
             fetchPriority={index < 6 ? "high" : "auto"}
-            quality={80}
+            unoptimized
             placeholder="blur"
             blurDataURL={item.imageBlurDataURL ?? undefined}
             className="object-cover transition-transform duration-500 group-hover:scale-110"
