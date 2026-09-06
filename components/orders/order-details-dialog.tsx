@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/utils";
+import { toImageProxyUrl } from "@/lib/utils";
 import type { OrderStatus, OrderView } from "@/lib/actions/orders";
 
 const STATUS_META: Record<OrderStatus, { label: string; cls: string }> = {
@@ -147,11 +148,11 @@ export function OrderDetailsDialog({
               className="flex items-center gap-3 rounded-2xl border border-border bg-background/40 p-3"
             >
               {i.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={i.imageUrl}
+                  src={toImageProxyUrl(i.imageUrl, { width: 100, height: 100, quality: 80 })!}
                   alt={i.name}
                   className="h-12 w-12 shrink-0 rounded-xl object-cover ring-1 ring-gold/30"
+                  loading="lazy"
                 />
               ) : (
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-gold/20 bg-gold/10 text-gold">
