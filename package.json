@@ -63,6 +63,7 @@
   "devDependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
     "@faker-js/faker": "^10.6.0",
+    "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
