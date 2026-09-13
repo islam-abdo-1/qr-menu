@@ -55,8 +55,6 @@
 
 - **Public Menu (Example):** https://site-menu.ddnsfree.com/m/kafy
 - **Staff Panel:** https://site-menu.ddnsfree.com/staff/kafy
-- **Admin Panel:** https://site-menu.ddnsfree.com/admin
-- **Health Check:** https://site-menu.ddnsfree.com/api/health
 
 ---
 
