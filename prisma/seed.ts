@@ -69,8 +69,8 @@ async function main() {
     },
     {
       slug: "demo",
-      name: "مطعم أبو القوة",
-      ownerId: "demo-owner",
+      name: "مطعم أبو القوة (تجريبي)",
+      ownerId: "demo-owner-2",  // Different ownerId to avoid unique constraint conflict
       staffPin: randomStaffPin(),
       billingExempt: true,
     },
@@ -94,6 +94,10 @@ async function main() {
         restaurantName: r.name,
         currency: "EGP",
         themePrimary: "#C84C21",
+        logoPublicId: null,
+        logoWidth: null,
+        logoHeight: null,
+        logoSizeKB: null,
       },
     });
 

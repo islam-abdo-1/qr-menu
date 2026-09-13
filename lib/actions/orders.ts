@@ -266,6 +266,7 @@ export async function createOrderAction(
               sizeCode: l.sizeCode,
               price: l.finalPrice,
               qty: l.qty,
+              restaurantId: restaurant.id,
             })),
           },
         },

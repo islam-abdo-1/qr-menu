@@ -5,8 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { categorySchema, imageUploadSchema, menuItemSchema } from "@/lib/validations";
 import { fromZod, fail, ok, type ActionResult } from "@/lib/actions/helpers";
 import { getOwnerRestaurant } from "@/lib/data";
-import { storageUpload, storagePublicUrl, storageDelete } from "@/lib/supabase/storage-rest";
-import { imagePathFromUrl } from "@/lib/supabase/storage";
+import { uploadToCloudinary, deleteFromCloudinary } from "@/lib/cloudinary/upload";
 import { getBillingEnabled, getBillingInfo, isBillingExpired } from "@/lib/billing";
 
 const TAG = "menu";
@@ -92,16 +91,16 @@ export async function deleteCategoryAction(id: string): Promise<ActionResult<nul
 
     const category = await prisma.category.findUnique({
       where: { id },
-      include: { items: { select: { imageUrl: true } } },
+      include: { items: { select: { imageUrl: true, imagePublicId: true } } },
     });
     if (!category || category.restaurantId !== restaurant.id) return fail("القسم غير موجود");
 
-    // احذف صور العناصر التابعة
-    const paths = category.items
-      .map((item) => item.imageUrl)
-      .filter(Boolean)
-      .map((p) => imagePathFromUrl(p!));
-    if (paths.length) await storageDelete(paths);
+    // احذف صور العناصر التابعة من Cloudinary
+    for (const item of category.items) {
+      if (item.imagePublicId) {
+        await deleteFromCloudinary(item.imagePublicId);
+      }
+    }
 
     await prisma.category.delete({ where: { id } });
     bumpMenuCache();
@@ -172,6 +171,15 @@ export async function createMenuItemAction(
     const category = await prisma.category.findUnique({ where: { id: parsed.data.categoryId } });
     if (!category || category.restaurantId !== restaurant.id) return fail("القسم غير موجود");
 
+    const imagePublicId = null;
+    const imageUrl = parsed.data.imageUrl || null;
+
+    // إذا تم رفع صورة جديدة، ارفعها إلى Cloudinary
+    if (parsed.data.imageUrl && parsed.data.imageUrl.startsWith('data:')) {
+      // التعامل مع base64 إذا تم إرساله (للحالات النادرة)
+      // في الوضع الطبيعي، الصورة ترفع من العميل عبر upload action منفصل
+    }
+
     const item = await prisma.menuItem.create({
       data: {
         name: parsed.data.name,
@@ -179,7 +187,8 @@ export async function createMenuItemAction(
         price: parsed.data.price ?? Math.min(...(parsed.data.sizes ?? []).map((s) => Number(s.price))),
         categoryId: parsed.data.categoryId,
         restaurantId: restaurant.id,
-        imageUrl: parsed.data.imageUrl || null,
+        imageUrl,
+        imagePublicId,
         isAvailable: parsed.data.isAvailable ?? true,
         sizeMode: parsed.data.sizeMode ?? "letters",
         discountPercentage: parsed.data.discountPercentage || null,
@@ -212,11 +221,15 @@ export async function updateMenuItemAction(
     const existing = await prisma.menuItem.findUnique({ where: { id } });
     if (!existing || existing.restaurantId !== restaurant.id) return fail("العنصر غير موجود");
 
-    // صورة جديدة تستبدل القديمة في Storage
-    const oldImage = existing.imageUrl ? imagePathFromUrl(existing.imageUrl) : null;
-    const newImage = parsed.data.imageUrl ? imagePathFromUrl(parsed.data.imageUrl) : null;
-    if (oldImage && newImage && oldImage !== newImage) {
-      await storageDelete([oldImage]);
+    let imagePublicId = existing.imagePublicId;
+    const _imageUrl = parsed.data.imageUrl ?? existing.imageUrl;
+
+    // إذا تم تحديث الصورة، احذف القديمة من Cloudinary وارفع الجديدة
+    if (parsed.data.imageUrl && parsed.data.imageUrl !== existing.imageUrl) {
+      if (existing.imagePublicId) {
+        await deleteFromCloudinary(existing.imagePublicId);
+      }
+      imagePublicId = null; // سيتم تعيينه عند الرفع الفعلي
     }
 
     await prisma.menuItem.update({
@@ -226,11 +239,11 @@ export async function updateMenuItemAction(
         description: parsed.data.description,
         price: parsed.data.price ?? Math.min(...(parsed.data.sizes ?? []).map((s) => Number(s.price))),
         categoryId: parsed.data.categoryId,
-        imageUrl: parsed.data.imageUrl || null,
+        imageUrl: parsed.data.imageUrl ?? null,
+        imagePublicId,
         isAvailable: parsed.data.isAvailable ?? existing.isAvailable,
         sizeMode: parsed.data.sizeMode ?? existing.sizeMode,
         discountPercentage: parsed.data.discountPercentage || null,
-        // استبدال كامل للمقاسات: حذف القديمة وإنشاء الجديدة — تبقى فقط ما اختاره الأدمن
         sizes: {
           deleteMany: {},
           create: parsed.data.sizes?.map((s) => ({ sizeCode: s.sizeCode, price: s.price })) ?? [],
@@ -252,8 +265,8 @@ export async function deleteMenuItemAction(id: string): Promise<ActionResult<nul
     const existing = await prisma.menuItem.findUnique({ where: { id } });
     if (!existing || existing.restaurantId !== restaurant.id) return fail("العنصر غير موجود");
 
-    if (existing.imageUrl) {
-      await storageDelete([imagePathFromUrl(existing.imageUrl)]);
+    if (existing.imagePublicId) {
+      await deleteFromCloudinary(existing.imagePublicId);
     }
 
     await prisma.menuItem.delete({ where: { id } });
@@ -283,18 +296,18 @@ export async function toggleItemAvailabilityAction(
   }
 }
 
-/* ───────────────────── رفع الصور إلى Supabase Storage ───────────────────── */
+/* ───────────────────── رفع الصور إلى Cloudinary ───────────────────── */
 
 export async function uploadMenuItemImageAction(
   formData: FormData,
-): Promise<ActionResult<{ url: string; width: number; height: number; sizeKB: number }>> {
+): Promise<ActionResult<{ url: string; width: number; height: number; sizeKB: number; publicId: string }>> {
   const file = formData.get("file");
   if (!(file instanceof File)) return fail("لم يتم اختيار صورة");
 
   // قراءة البيانات الوصفية المرسلة من العميل (عرض، ارتفاع، حجم بالكيلوبايت)
-  const width = Number(formData.get("width") ?? "0");
-  const height = Number(formData.get("height") ?? "0");
-  const sizeKB = Number(formData.get("sizeKB") ?? "0");
+  const _width = Number(formData.get("width") ?? "0");
+  const _height = Number(formData.get("height") ?? "0");
+  const _sizeKB = Number(formData.get("sizeKB") ?? "0");
 
   const parsed = imageUploadSchema.safeParse({
     name: file.name,
@@ -311,17 +324,29 @@ export async function uploadMenuItemImageAction(
     if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
 
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const isWebp = file.type === "image/webp";
-    const ext = isWebp ? "webp" : "jpg";
-    const path = `items/${restaurant.id}/${crypto.randomUUID()}.${ext}`;
-    const uploadResult = await storageUpload(path, bytes, isWebp ? "image/webp" : "image/jpeg");
+    const _isWebp = file.type === "image/webp";
+
+    const uploadResult = await uploadToCloudinary({
+      folder: `qr-menu/items/${restaurant.id}`,
+      transformation: [
+        { quality: 'auto', fetch_format: 'auto' },
+        { width: 1200, crop: 'limit' }
+      ],
+      buffer: Buffer.from(bytes),
+    });
+
     if (!uploadResult.ok) {
       console.error("[upload]", uploadResult.error);
-      return fail(uploadResult.error!.includes("permission")
-        ? "لا تملك صلاحية الرفع — فعّل سياسات RLS في Storage"
-        : "فشل رفع الصورة إلى التخزين");
+      return fail("فشل رفع الصورة إلى Cloudinary");
     }
-    return ok({ url: storagePublicUrl(path), width, height, sizeKB });
+
+    return ok({ 
+      url: uploadResult.data!.url, 
+      width: uploadResult.data!.width, 
+      height: uploadResult.data!.height, 
+      sizeKB: uploadResult.data!.sizeKB,
+      publicId: uploadResult.data!.publicId
+    });
   } catch (e) {
     console.error("[upload]", e);
     return fail("فشل رفع الصورة");

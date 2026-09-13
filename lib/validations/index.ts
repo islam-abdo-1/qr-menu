@@ -73,6 +73,7 @@ export const settingsSchema = z.object({
     .regex(/^#[0-9a-fA-F]{6}$/, "لون غير صالح (مثال: #C84C21)")
     .optional(),
   logoUrl: z.string().trim().max(500).optional().nullable(),
+  logoPublicId: z.string().optional().nullable(),
   logoWidth: z.coerce.number().int().min(1).max(20000).optional().nullable(),
   logoHeight: z.coerce.number().int().min(1).max(20000).optional().nullable(),
   logoSizeKB: z.coerce.number().int().min(1).max(20000).optional().nullable(),

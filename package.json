@@ -45,6 +45,7 @@
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.0",
     "class-variance-authority": "^0.7.1",
+    "cloudinary": "^2.11.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.43.0",
     "lucide-react": "^1.28.0",

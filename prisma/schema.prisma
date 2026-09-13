@@ -30,6 +30,7 @@ model Restaurant {
   categories Category[]
   menuItems  MenuItem[]
   orders     Order[]
+  orderItems OrderItem[]  // Items from all orders for analytics
   tables     Table[]
   dayStats   DayStat[]
   staff      Staff[]
@@ -90,6 +91,7 @@ model Setting {
   currency         String     @default("EGP")
   themePrimary     String     @default("#C84C21")
   logoUrl          String?    @default("")
+  logoPublicId     String?    // Cloudinary public ID for easy deletion
   logoWidth        Int?
   logoHeight       Int?
   logoSizeKB       Int?
@@ -118,19 +120,21 @@ model MenuItem {
   price              Float
   discountPercentage Int? // 0-100 — null/0 = لا خصم
   imageUrl           String?
+  imagePublicId      String?          // Cloudinary public ID for easy deletion
   imageWidth         Int? // بيانات تعريف الصورة المضغوطة — تُحسب أثناء الرفع (URL فقط يبقى في العمود أعلاه)
   imageHeight        Int?
   imageSizeKB        Int?
   imageBlurDataURL   String? // Base64 blur placeholder (20x20 webp) for LQIP
   isAvailable        Boolean           @default(true)
   sizeMode           String            @default("letters") // letters (S/M/L) أو weight (ربع/نص/كيلو + مخصص) — وضع واحد فقط لكل صنف
-  categoryId         String            @db.Uuid // FK لـ Category — uuid مطابق لنوع المفتاح المرجعي (SEC-003)
+  categoryId         String            // FK لـ Category — cuid text (matches Category.id)
   category           Category          @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   createdAt          DateTime          @default(now())
   sizes              MenuItemSize[]
 
   @@index([restaurantId])
   @@index([categoryId])
+  @@index([imagePublicId])
 }
 
 /// مقاس محدد لصنف (حرفي S/M/L أو وزني مثل «ربع كيلو»/«كيلو ونص») بسعر خاص به — يُستخدم عند الطلب
@@ -138,7 +142,7 @@ model MenuItemSize {
   id         String   @id @default(uuid())
   sizeCode   String // S | M | L | ربع كيلو | نص كيلو | كيلو | وزن مخصص
   price      Float
-  menuItemId String   @db.Uuid // FK لـ MenuItem — uuid مطابق لنوع المفتاح المرجعي (SEC-003)
+  menuItemId String   // FK لـ MenuItem — cuid text (matches MenuItem.id)
   menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
 
@@ -148,7 +152,7 @@ model MenuItemSize {
 
 /// طلب — يمكن تقديمه بدون حساب (الزبون قد يربطه بحسابه لاحقًا)
 model Order {
-  id           String      @id @default(uuid())
+  id           String      @id @default(uuid()) @db.Uuid
   restaurantId String
   restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   number       Int
@@ -231,6 +235,7 @@ model OrderItem {
   qty           Int
   restaurantId  String  // للفهارس المركبة والاستعلامات السريعة
   restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
 
   @@index([orderId])
   @@index([itemId])
