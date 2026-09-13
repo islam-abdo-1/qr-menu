@@ -9,12 +9,23 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { generateUniqueStaffPin } from "@/lib/staff-pin";
 import { verifyTurnstile } from "@/lib/turnstile";
+import { rateLimitIp } from "@/lib/rate-limit";
+import { headers } from "next/headers";
 
 export async function signInAction(
   email: string,
   password: string,
   turnstileToken?: string,
 ): Promise<ActionResult<null>> {
+  // Rate limiting: 10 attempts per 15 minutes per IP
+  const headersList = headers();
+  const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() || 
+             headersList.get("x-real-ip") || "unknown";
+  const rl = await rateLimitIp("auth-signin", ip, 10, 15 * 60 * 1000);
+  if (!rl.ok) {
+    return fail(`طلبات كثيرة — حاول بعد ${rl.retryAfterSeconds} ثانية`);
+  }
+
   const parsed = credentialsSchema.safeParse({ email, password });
   if (!parsed.success) {
     const { error, fieldErrors } = fromZod(parsed.error);
@@ -148,6 +159,15 @@ export async function signInCustomerAction(
   email: string,
   password: string,
 ): Promise<ActionResult<null>> {
+  // Rate limiting: 10 attempts per 15 minutes per IP
+  const headersList = headers();
+  const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() || 
+             headersList.get("x-real-ip") || "unknown";
+  const rl = await rateLimitIp("customer-signin", ip, 10, 15 * 60 * 1000);
+  if (!rl.ok) {
+    return fail(`طلبات كثيرة — حاول بعد ${rl.retryAfterSeconds} ثانية`);
+  }
+
   const parsed = credentialsSchema.safeParse({ email, password });
   if (!parsed.success) {
     const { error, fieldErrors } = fromZod(parsed.error);
@@ -168,6 +188,15 @@ export async function signUpCustomerAction(
   email: string,
   password: string,
 ): Promise<ActionResult<null>> {
+  // Rate limiting: 5 registrations per hour per IP
+  const headersList = headers();
+  const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() || 
+             headersList.get("x-real-ip") || "unknown";
+  const rl = await rateLimitIp("customer-signup", ip, 5, 60 * 60 * 1000);
+  if (!rl.ok) {
+    return fail(`طلبات كثيرة — حاول بعد ${rl.retryAfterSeconds} ثانية`);
+  }
+
   const parsed = credentialsSchema.safeParse({ email, password });
   if (!parsed.success) {
     const { error, fieldErrors } = fromZod(parsed.error);
@@ -208,6 +237,15 @@ export async function registerRestaurantAction(
   input: z.infer<typeof signupSchema>,
   turnstileToken?: string,
 ): Promise<ActionResult<{ slug: string }>> {
+  // Rate limiting: 5 registrations per hour per IP
+  const headersList = headers();
+  const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() || 
+             headersList.get("x-real-ip") || "unknown";
+  const rl = await rateLimitIp("auth-register", ip, 5, 60 * 60 * 1000);
+  if (!rl.ok) {
+    return fail(`طلبات كثيرة — حاول بعد ${rl.retryAfterSeconds} ثانية`);
+  }
+
   const parsed = signupSchema.safeParse(input);
   if (!parsed.success) {
     const { error, fieldErrors } = fromZod(parsed.error);

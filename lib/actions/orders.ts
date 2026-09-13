@@ -9,6 +9,8 @@ import { applyDiscount } from "@/lib/utils";
 import { isValidPhone } from "@/lib/utils";
 import { getStaffSession, setStaffSession, clearStaffSession } from "@/lib/staff-session";
 import { getBillingEnabled, getBillingInfo, isBillingExpired } from "@/lib/billing";
+import { rateLimitIp } from "@/lib/rate-limit";
+import { headers } from "next/headers";
 
 export type OrderStatus = "new" | "preparing" | "done";
 
@@ -45,18 +47,27 @@ export type OrderView = {
   }[];
 };
 
-async function loadOrders(restaurantId: string): Promise<OrderView[]> {
+export type OrdersPaginationParams = {
+  cursor?: string;
+  limit?: number;
+};
+
+async function loadOrders(restaurantId: string, params?: OrdersPaginationParams): Promise<OrderView[]> {
   // استعلامان متوازيان خفيفان:
   //  - النشط (جديد/في التحضير): يُجلب كاملًا دائمًا — لا يختفي طلب شغال أبدًا
   //  - المكتمل: آخر 30 يومًا (مطابق للتنظيف التلقائي) بحد 500 —
   //    يكفي للتاريخ الكامل دون تضخم الاستجابة. الأقدم يُمسح تلقائيًا من القاعدة.
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const { limit = 50, cursor } = params || {};
+  
   const [active, done] = await Promise.all([
     prisma.order.findMany({
       where: { restaurantId, status: { in: ["new", "preparing"] } },
       include: {
         items: { select: { id: true, name: true, price: true, qty: true, sizeCode: true, itemId: true } },
       },
+      take: limit,
+      cursor: cursor ? { id: cursor } : undefined,
     }),
     prisma.order.findMany({
       where: { restaurantId, status: "done", createdAt: { gte: since } },
@@ -64,7 +75,8 @@ async function loadOrders(restaurantId: string): Promise<OrderView[]> {
         items: { select: { id: true, name: true, price: true, qty: true, sizeCode: true, itemId: true } },
       },
       orderBy: { createdAt: "desc" },
-      take: 50,
+      take: limit,
+      cursor: cursor ? { id: cursor } : undefined,
     }),
   ]);
 
@@ -136,6 +148,15 @@ export type CreateOrderInput = {
 export async function createOrderAction(
   input: CreateOrderInput,
 ): Promise<ActionResult<{ number: number; total: number }>> {
+  // Rate limiting: 30 orders per minute per IP
+  const headersList = headers();
+  const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() || 
+             headersList.get("x-real-ip") || "unknown";
+  const rl = await rateLimitIp("order-create", ip, 30, 60 * 1000);
+  if (!rl.ok) {
+    return fail(`طلبات كثيرة — حاول بعد ${rl.retryAfterSeconds} ثانية`);
+  }
+
   const parsed = orderSchema.safeParse(input);
   if (!parsed.success) {
     const { error, fieldErrors } = fromZod(parsed.error);
@@ -289,7 +310,7 @@ export async function createOrderAction(
 
 /* ───────────────────── المالك (لوحة الإدارة) ───────────────────── */
 
-export async function getOrdersAction(): Promise<ActionResult<OrderView[]>> {
+export async function getOrdersAction(params?: OrdersPaginationParams): Promise<ActionResult<OrderView[]>> {
   try {
     const restaurant = await getOwnerRestaurant();
     if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
@@ -297,7 +318,7 @@ export async function getOrdersAction(): Promise<ActionResult<OrderView[]>> {
     if (isBillingExpired(getBillingInfo(restaurant, billingEnabled))) {
       return fail("انتهت الفترة المجانية — جدّد اشتراكك");
     }
-    return ok(await loadOrders(restaurant.id));
+    return ok(await loadOrders(restaurant.id, params));
   } catch (e) {
     console.error("[orders] admin list failed:", e);
     return fail("تعذّر تحميل الطلبات");
@@ -346,6 +367,15 @@ export async function staffLoginAction(
 ): Promise<
   ActionResult<{ restaurantName: string; slug: string; name: string }>
 > {
+  // Rate limiting: 5 attempts per 15 minutes per IP
+  const headersList = headers();
+  const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() || 
+             headersList.get("x-real-ip") || "unknown";
+  const rl = await rateLimitIp("staff-login", ip, 5, 15 * 60 * 1000);
+  if (!rl.ok) {
+    return fail(`محاولات كثيرة — حاول بعد ${rl.retryAfterSeconds} ثانية`);
+  }
+
   const parsed = staffLoginSchema.safeParse({ name, pin });
   if (!parsed.success) {
     const { error } = fromZod(parsed.error);
@@ -421,7 +451,7 @@ export async function staffLogoutAction(): Promise<ActionResult<null>> {
   return ok(null);
 }
 
-export async function getStaffOrdersAction(): Promise<
+export async function getStaffOrdersAction(params?: OrdersPaginationParams): Promise<
   ActionResult<{
     restaurantName: string;
     staffName: string;
@@ -441,7 +471,7 @@ export async function getStaffOrdersAction(): Promise<
     return ok({
       restaurantName: setting?.restaurantName || restaurant.name,
       staffName: session.name,
-      orders: await loadOrders(restaurant.id),
+      orders: await loadOrders(restaurant.id, params),
       brand: {
         logoUrl: setting?.logoUrl || null,
         currency: setting?.currency || "EGP",

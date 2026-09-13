@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
+import { Readable } from 'stream';
 
 /**
  * Image Proxy API
@@ -11,7 +12,7 @@ import sharp from 'sharp';
  * 
  * Benefits:
  * - Images served via Vercel Edge Network (CDN)
- * - On-the-fly optimization (resize, compress, format conversion)
+ * - On-the-fly optimization (resize, compress, format conversion) with STREAMING
  * - Proper cache headers (immutable for 1 year)
  * - Reduces origin bandwidth and latency
  */
@@ -48,6 +49,72 @@ function parseParams(searchParams: URLSearchParams) {
   return { url, width, height, quality, format, fit };
 }
 
+function buildSharpPipeline(
+  inputStream: ReadableStream<Uint8Array>,
+  width: number,
+  height: number,
+  quality: number,
+  format: 'webp' | 'jpeg' | 'png' | 'avif',
+  fit: 'cover' | 'contain' | 'fill' | 'inside' | 'outside'
+): ReadableStream<Uint8Array> {
+  const sharpInstance = sharp();
+  
+  // Configure sharp pipeline
+  if (width > 0 || height > 0) {
+    sharpInstance.resize(width || null, height || null, { fit, withoutEnlargement: true });
+  }
+  
+  switch (format) {
+    case 'avif':
+      sharpInstance.avif({ quality, effort: 4 });
+      break;
+    case 'webp':
+      sharpInstance.webp({ quality, effort: 4 });
+      break;
+    case 'jpeg':
+      sharpInstance.jpeg({ quality, mozjpeg: true });
+      break;
+    case 'png':
+      sharpInstance.png({ quality, compressionLevel: 9 });
+      break;
+  }
+  
+  // Convert web stream to node stream for sharp
+  const reader = inputStream.getReader();
+  const nodeStream = new Readable({
+    async read() {
+      const { done, value } = await reader.read();
+      if (done) {
+        this.push(null);
+      } else {
+        this.push(Buffer.from(value));
+      }
+    }
+  });
+  
+  const sharpStream = sharpInstance;
+  nodeStream.pipe(sharpStream);
+  
+  // Convert sharp output back to web stream
+  const outputStream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      sharpStream.on('data', (chunk: Buffer) => {
+        controller.enqueue(new Uint8Array(chunk));
+      });
+      
+      sharpStream.on('end', () => {
+        controller.close();
+      });
+      
+      sharpStream.on('error', (err: Error) => {
+        controller.error(err);
+      });
+    }
+  });
+  
+  return outputStream;
+}
+
 export async function GET(request: NextRequest) {
   const { url, width, height, quality, format, fit } = parseParams(request.nextUrl.searchParams);
   
@@ -78,52 +145,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'URL does not point to an image' }, { status: 400 });
     }
 
-const arrayBuffer = await response.arrayBuffer();
-    const inputBuffer = Buffer.from(arrayBuffer);
+    // Get content length for potential Content-Length header
+    const contentLength = response.headers.get('content-length');
     
-    // Optimize with sharp
-    let sharpInstance = sharp(inputBuffer);
+    // Build streaming pipeline
+    const outputStream = buildSharpPipeline(response.body!, width, height, quality, format, fit);
     
-    // Get original dimensions
-    await sharpInstance.metadata();
+    // Determine output content type
+    const outputContentTypeMap: Record<string, string> = {
+      avif: 'image/avif',
+      webp: 'image/webp',
+      jpeg: 'image/jpeg',
+      png: 'image/png',
+    };
+    const outputContentType = outputContentTypeMap[format] || 'image/webp';
     
-    // Resize if dimensions specified
-    if (width > 0 || height > 0) {
-      sharpInstance = sharpInstance.resize(width || null, height || null, {
-        fit,
-        withoutEnlargement: true,
-      });
-    }
-
-    // Convert format and compress
-    let outputBuffer: Uint8Array;
-    let outputContentType: string;
-
-    switch (format) {
-      case 'avif':
-        outputBuffer = await sharpInstance.avif({ quality, effort: 4 }).toBuffer();
-        outputContentType = 'image/avif';
-        break;
-      case 'webp':
-        outputBuffer = await sharpInstance.webp({ quality, effort: 4 }).toBuffer();
-        outputContentType = 'image/webp';
-        break;
-      case 'jpeg':
-        outputBuffer = await sharpInstance.jpeg({ quality, mozjpeg: true }).toBuffer();
-        outputContentType = 'image/jpeg';
-        break;
-      case 'png':
-        outputBuffer = await sharpInstance.png({ quality, compressionLevel: 9 }).toBuffer();
-        outputContentType = 'image/png';
-        break;
-      default:
-        outputBuffer = await sharpInstance.webp({ quality, effort: 4 }).toBuffer();
-        outputContentType = 'image/webp';
-    }
-
-    // Generate ETag from buffer hash
+    // Generate a weak ETag based on URL and params (for conditional requests)
+    const etagBase = `${url}:${width}:${height}:${quality}:${format}:${fit}`;
     const crypto = await import('crypto');
-    const etag = crypto.createHash('sha256').update(outputBuffer).digest('hex').substring(0, 16);
+    const etag = crypto.createHash('sha256').update(etagBase).digest('hex').substring(0, 16);
     
     // Check If-None-Match for conditional requests
     const ifNoneMatch = request.headers.get('if-none-match');
@@ -131,19 +171,20 @@ const arrayBuffer = await response.arrayBuffer();
       return new NextResponse(null, { status: 304 });
     }
 
-    // Return optimized image with cache headers
-    return new NextResponse(outputBuffer as unknown as Uint8Array<ArrayBuffer>, {
+    // Build response headers
+    const headers = new Headers();
+    headers.set('Content-Type', outputContentType);
+    headers.set('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year
+    headers.set('ETag', etag);
+    headers.set('Vary', 'Accept');
+    if (contentLength) {
+      headers.set('Content-Length', contentLength);
+    }
+
+    // Return streaming response
+    return new NextResponse(outputStream, {
       status: 200,
-      headers: {
-        'Content-Type': outputContentType,
-        'Content-Length': String(outputBuffer.length),
-        'Cache-Control': 'public, max-age=31536000, immutable', // 1 year
-        'ETag': etag,
-        'X-Original-Size': String(inputBuffer.length),
-        'X-Optimized-Size': String(outputBuffer.length),
-        'X-Savings': `${Math.round((1 - outputBuffer.length / inputBuffer.length) * 100)}%`,
-        'Vary': 'Accept',
-      },
+      headers,
     });
 
   } catch (error) {

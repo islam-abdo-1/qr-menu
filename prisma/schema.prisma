@@ -221,18 +221,21 @@ model Table {
 }
 
 model OrderItem {
-  id       String  @id @default(uuid())
-  orderId  String  @db.Uuid // FK لـ Order — uuid مطابق لنوع المفتاح المرجعي (SEC-003)
-  order    Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  itemId   String? // مرجع الصنف الأصلي (لتقارير الأكثر مبيعًا) — بلا FK حسب التصميم
-  name     String
-  sizeCode String? // S/M/L/XL عند طلب صنف بمقاس — يظهر للموظف والأدمن
-  price    Float // السعر النهائي المحسوب (بعد الخصم إن وُجد)
-  qty      Int
+  id            String  @id @default(uuid())
+  orderId       String  @db.Uuid // FK لـ Order — uuid مطابق لنوع المفتاح المرجعي (SEC-003)
+  order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId        String? // مرجع الصنف الأصلي (لتقارير الأكثر مبيعًا) — بلا FK حسب التصميم
+  name          String
+  sizeCode      String? // S/M/L/XL عند طلب صنف بمقاس — يظهر للموظف والأدمن
+  price         Float // السعر النهائي المحسوب (بعد الخصم إن وُجد)
+  qty           Int
+  restaurantId  String  // للفهارس المركبة والاستعلامات السريعة
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([itemId])
   @@index([itemId, orderId])
+  @@index([restaurantId, itemId, createdAt(sort: Desc)])
 }
 
 

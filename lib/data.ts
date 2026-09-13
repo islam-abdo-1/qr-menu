@@ -108,6 +108,11 @@ export type MenuCategory = {
   }[];
 };
 
+export type MenuPaginationParams = {
+  cursor?: string;
+  limit?: number;
+};
+
 export type MenuData = {
   settings: {
     restaurantName: string;
@@ -119,10 +124,15 @@ export type MenuData = {
   categories: MenuCategory[];
   bestSellers: string[];
   tables: MenuTable[];
+  pagination?: {
+    hasMore: boolean;
+    nextCursor?: string;
+  };
 };
 
-async function loadRestaurant(restaurantId: string): Promise<MenuData> {
+async function loadRestaurant(restaurantId: string, params?: MenuPaginationParams): Promise<MenuData> {
   try {
+    const { limit = 50, cursor } = params || {};
     const [settings, categories, bestSellers, tables] = await Promise.all([
       prisma.setting.findUnique({ where: { restaurantId } }),
       prisma.category.findMany({
@@ -137,7 +147,7 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
               description: true,
               price: true,
               discountPercentage: true,
-              sizeMode: true,
+sizeMode: true,
               sizes: { select: { sizeCode: true, price: true } },
               imageUrl: true,
               imageBlurDataURL: true,
@@ -145,6 +155,8 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
             },
           },
         },
+        take: limit + 1, // fetch one extra to check hasMore
+        cursor: cursor ? { id: cursor } : undefined,
       }),
       getBestSellers(restaurantId),
       prisma.table.findMany({
@@ -170,6 +182,12 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
       }))
       .filter((c) => c.items.length > 0);
 
+    // Check if there are more items
+    const hasMore = categories.some(c => c.items.length > limit);
+    const nextCursor = hasMore && categories.length > 0 
+      ? categories[categories.length - 1].items[categories[categories.length - 1].items.length - 1]?.id 
+      : undefined;
+
     return {
       settings: settings
         ? {
@@ -183,6 +201,10 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
       categories: visible,
       bestSellers: bestSellers,
       tables: tables.map((t) => ({ number: t.number, reserved: t.reserved })),
+      pagination: {
+        hasMore,
+        nextCursor,
+      },
     };
   } catch (e) {
     // لا نعيد منيو فارغًا عند تعذّر الاتصال — فإعادة البناء الفاشلة تُبقي آخر كاش صالح
@@ -196,13 +218,17 @@ async function loadRestaurant(restaurantId: string): Promise<MenuData> {
  * منيو مطعم — بدون slug: المطعم الرئيسي (الرابط الأساسي للموقع).
  * البيانات في كاش ISR لمدة 300 ثانية (تُحدَّث فورًا من لوحة الإدارة عبر revalidateTag).
  * Stale-while-revalidate يتم عبر PWA config (StaleWhileRevalidate handler للـ /m/*).
+ * يدعم pagination عبر cursor-based pagination.
  */
 export const getMenuData = cache(
-  async (slug?: string): Promise<MenuData | null> => {
+  async (slug?: string, params?: MenuPaginationParams): Promise<MenuData | null> => {
+    const { limit = 50, cursor } = params || {};
     const restaurant = slug
       ? await prisma.restaurant.findUnique({ where: { slug } })
       : await prisma.restaurant.findFirst({ orderBy: { createdAt: "asc" } });
-    return restaurant ? loadRestaurant(restaurant.id) : null;
+    if (!restaurant) return null;
+    
+    return loadRestaurant(restaurant.id, { limit, cursor });
   },
   ["qr-menu"],
   { tags: [MENU_TAG], revalidate: 30 },
@@ -214,17 +240,20 @@ export const getMenuData = cache(
  */
 export const getBestSellers = cache(
   async (restaurantId: string): Promise<string[]> => {
-    const bestSellers = await prisma.$queryRaw<{ itemId: string }[]>`
-      SELECT oi."itemId"
-      FROM "OrderItem" oi
-      JOIN "Order" o ON o."id" = oi."orderId"
-      WHERE o."restaurantId" = ${restaurantId} AND oi."itemId" IS NOT NULL
-        AND o."createdAt" >= ${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)}::timestamptz
-      GROUP BY oi."itemId"
-      ORDER BY SUM(oi."qty") DESC
-      LIMIT 3
-    `;
-    return bestSellers.map((b) => b.itemId);
+    const bestSellers = await prisma.orderItem.groupBy({
+      by: ['itemId'],
+      where: {
+        itemId: { not: null },
+        order: {
+          restaurantId,
+          createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+        },
+      },
+      _sum: { qty: true },
+      orderBy: { _sum: { qty: 'desc' } },
+      take: 3,
+    });
+    return bestSellers.map((b) => b.itemId!).filter(Boolean);
   },
   ["qr-menu-best-sellers"],
   { tags: [MENU_TAG], revalidate: 300 },
