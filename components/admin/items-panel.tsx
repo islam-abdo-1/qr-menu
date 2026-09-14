@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -38,18 +38,24 @@ export function ItemsPanel({ data, onChanged }: Props) {
   const [busyDelete, setBusyDelete] = useState(false);
   const [busyToggle, setBusyToggle] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [localCategories, setLocalCategories] = useState(data.categories);
+
+  // تحديث الـ local categories عند تغير الـ data من السيرفر
+  useEffect(() => {
+    setLocalCategories(data.categories);
+  }, [data.categories]);
 
   const q = query.trim().toLowerCase();
 
   const visibleCategories = useMemo(() => {
-    if (!q) return data.categories;
-    return data.categories
+    if (!q) return localCategories;
+    return localCategories
       .map((c) => ({
         ...c,
         items: c.items.filter((i) => i.name.toLowerCase().includes(q)),
       }))
       .filter((c) => c.items.length > 0);
-  }, [data.categories, q]);
+  }, [localCategories, q]);
 
   async function handleToggle(item: AdminItem) {
     setBusyToggle(item.id);
@@ -65,15 +71,30 @@ export function ItemsPanel({ data, onChanged }: Props) {
 
   async function handleDelete() {
     if (!deleting) return;
+    const itemId = deleting.id;
     setBusyDelete(true);
-    const res = await deleteMenuItemAction(deleting.id);
+    
+    // Optimistic: احذف من الـ UI فوراً
+    setLocalCategories((prev) =>
+      prev
+        .map((c) => ({
+          ...c,
+          items: c.items.filter((i) => i.id !== itemId),
+        }))
+        .filter((c) => c.items.length > 0)
+    );
+    
+    const res = await deleteMenuItemAction(itemId);
     setBusyDelete(false);
+    
     if (res.ok) {
       toast.success("تم حذف العنصر");
       setDeleting(null);
-      onChanged();
+      onChanged(); // يعيد المزامنة مع السيرفر
     } else {
       toast.error(res.error);
+      // Rollback: أعد تحميل البيانات من السيرفر عند الفشل
+      onChanged();
     }
   }
 
