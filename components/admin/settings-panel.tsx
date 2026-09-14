@@ -1,8 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Bike, Image as ImageIcon, Loader2, Save, Store } from "lucide-react";
+import { Bike, Image as ImageIcon, Key, Loader2, Save, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -190,6 +191,32 @@ export function SettingsPanel({ settings, onSaved, dashboardUrl }: Props) {
             حفظ الإعدادات
           </Button>
         </form>
+
+        {/* تغيير كلمة المرور */}
+        <div className="border-t border-border pt-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gold/10 text-gold">
+                <Key className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="font-black text-cream">تغيير كلمة المرور</p>
+                <p className="text-xs text-muted-foreground">حدّث كلمة مرور حسابك الحالي</p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              asChild
+              className="h-11 rounded-xl px-6"
+              disabled={saving}
+            >
+              <a href="/admin/change-password">
+                <Key className="h-4 w-4 mr-2" />
+                تغيير كلمة المرور
+              </a>
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div className="border-t border-border p-6 sm:p-8">

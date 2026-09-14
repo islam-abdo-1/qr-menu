@@ -94,10 +94,6 @@ async function main() {
         restaurantName: r.name,
         currency: "EGP",
         themePrimary: "#C84C21",
-        logoPublicId: null,
-        logoWidth: null,
-        logoHeight: null,
-        logoSizeKB: null,
       },
     });
 

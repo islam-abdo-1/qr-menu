@@ -21,14 +21,22 @@ function diskError(e: unknown) {
 }
 
 /**
- * مطعم المالك من الجلسة — بدون مطعم (أو محظور/منتهي الاشتراك) لا توجد أي عملية تعديل
+ * نتيجة التحقق من مطعم المالك — يميز بين أسباب الفشل
  */
-async function requireOwnerRestaurant() {
+type OwnerRestaurantResult =
+  | { ok: true; restaurant: NonNullable<Awaited<ReturnType<typeof getOwnerRestaurant>>> }
+  | { ok: false; reason: "not_found" | "blocked" | "billing_expired" };
+
+/**
+ * مطعم المالك من الجلسة — يعيد سبب الفشل الدقيق
+ */
+async function requireOwnerRestaurant(): Promise<OwnerRestaurantResult> {
   const restaurant = await getOwnerRestaurant();
-  if (!restaurant || restaurant.blocked) return null;
+  if (!restaurant) return { ok: false, reason: "not_found" };
+  if (restaurant.blocked) return { ok: false, reason: "blocked" };
   const billingEnabled = await getBillingEnabled();
-  if (isBillingExpired(getBillingInfo(restaurant, billingEnabled))) return null;
-  return restaurant;
+  if (isBillingExpired(getBillingInfo(restaurant, billingEnabled))) return { ok: false, reason: "billing_expired" };
+  return { ok: true, restaurant };
 }
 
 /* ───────────────────────── الأقسام ───────────────────────── */
@@ -42,8 +50,9 @@ export async function createCategoryAction(
     return fail(error, fieldErrors);
   }
   try {
-    const restaurant = await requireOwnerRestaurant();
-    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    const result = await requireOwnerRestaurant();
+    if (!result.ok) return fail({ not_found: "لا يوجد مطعم مرتبط بحسابك", blocked: "المطعم محظور — تواصل مع الإدارة", billing_expired: "انتهت الفترة المجانية — جدّد اشتراكك" }[result.reason]);
+    const restaurant = result.restaurant;
 
     const count = await prisma.category.count({
       where: { restaurantId: restaurant.id },
@@ -73,8 +82,9 @@ export async function updateCategoryAction(
     return fail(error, fieldErrors);
   }
   try {
-    const restaurant = await requireOwnerRestaurant();
-    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    const result = await requireOwnerRestaurant();
+    if (!result.ok) return fail({ not_found: "لا يوجد مطعم مرتبط بحسابك", blocked: "المطعم محظور — تواصل مع الإدارة", billing_expired: "انتهت الفترة المجانية — جدّد اشتراكك" }[result.reason]);
+    const restaurant = result.restaurant;
 
     const existing = await prisma.category.findUnique({ where: { id } });
     if (!existing || existing.restaurantId !== restaurant.id) return fail("القسم غير موجود");
@@ -89,8 +99,9 @@ export async function updateCategoryAction(
 
 export async function deleteCategoryAction(id: string): Promise<ActionResult<null>> {
   try {
-    const restaurant = await requireOwnerRestaurant();
-    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    const result = await requireOwnerRestaurant();
+    if (!result.ok) return fail({ not_found: "لا يوجد مطعم مرتبط بحسابك", blocked: "المطعم محظور — تواصل مع الإدارة", billing_expired: "انتهت الفترة المجانية — جدّد اشتراكك" }[result.reason]);
+    const restaurant = result.restaurant;
 
     const category = await prisma.category.findUnique({
       where: { id },
@@ -115,8 +126,9 @@ export async function deleteCategoryAction(id: string): Promise<ActionResult<nul
 
 export async function reorderCategoriesAction(ids: string[]): Promise<ActionResult<null>> {
   try {
-    const restaurant = await requireOwnerRestaurant();
-    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    const result = await requireOwnerRestaurant();
+    if (!result.ok) return fail({ not_found: "لا يوجد مطعم مرتبط بحسابك", blocked: "المطعم محظور — تواصل مع الإدارة", billing_expired: "انتهت الفترة المجانية — جدّد اشتراكك" }[result.reason]);
+    const restaurant = result.restaurant;
 
     const owned = await prisma.category.findMany({
       where: { id: { in: ids }, restaurantId: restaurant.id },
@@ -168,8 +180,9 @@ export async function createMenuItemAction(
     return fail(error, fieldErrors);
   }
   try {
-    const restaurant = await requireOwnerRestaurant();
-    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    const result = await requireOwnerRestaurant();
+    if (!result.ok) return fail({ not_found: "لا يوجد مطعم مرتبط بحسابك", blocked: "المطعم محظور — تواصل مع الإدارة", billing_expired: "انتهت الفترة المجانية — جدّد اشتراكك" }[result.reason]);
+    const restaurant = result.restaurant;
 
     const category = await prisma.category.findUnique({ where: { id: parsed.data.categoryId } });
     if (!category || category.restaurantId !== restaurant.id) return fail("القسم غير موجود");
@@ -210,8 +223,9 @@ export async function updateMenuItemAction(
     return fail(error, fieldErrors);
   }
   try {
-    const restaurant = await requireOwnerRestaurant();
-    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    const result = await requireOwnerRestaurant();
+    if (!result.ok) return fail({ not_found: "لا يوجد مطعم مرتبط بحسابك", blocked: "المطعم محظور — تواصل مع الإدارة", billing_expired: "انتهت الفترة المجانية — جدّد اشتراكك" }[result.reason]);
+    const restaurant = result.restaurant;
 
     const existing = await prisma.menuItem.findUnique({ where: { id } });
     if (!existing || existing.restaurantId !== restaurant.id) return fail("العنصر غير موجود");
@@ -250,8 +264,9 @@ export async function updateMenuItemAction(
 
 export async function deleteMenuItemAction(id: string): Promise<ActionResult<null>> {
   try {
-    const restaurant = await requireOwnerRestaurant();
-    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    const result = await requireOwnerRestaurant();
+    if (!result.ok) return fail({ not_found: "لا يوجد مطعم مرتبط بحسابك", blocked: "المطعم محظور — تواصل مع الإدارة", billing_expired: "انتهت الفترة المجانية — جدّد اشتراكك" }[result.reason]);
+    const restaurant = result.restaurant;
 
     const existing = await prisma.menuItem.findUnique({ where: { id } });
     if (!existing || existing.restaurantId !== restaurant.id) return fail("العنصر غير موجود");
@@ -273,8 +288,9 @@ export async function toggleItemAvailabilityAction(
   isAvailable: boolean,
 ): Promise<ActionResult<null>> {
   try {
-    const restaurant = await requireOwnerRestaurant();
-    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    const result = await requireOwnerRestaurant();
+    if (!result.ok) return fail({ not_found: "لا يوجد مطعم مرتبط بحسابك", blocked: "المطعم محظور — تواصل مع الإدارة", billing_expired: "انتهت الفترة المجانية — جدّد اشتراكك" }[result.reason]);
+    const restaurant = result.restaurant;
 
     const existing = await prisma.menuItem.findUnique({ where: { id } });
     if (!existing || existing.restaurantId !== restaurant.id) return fail("العنصر غير موجود");
@@ -311,8 +327,9 @@ export async function uploadMenuItemImageAction(
   }
 
   try {
-    const restaurant = await requireOwnerRestaurant();
-    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    const result = await requireOwnerRestaurant();
+    if (!result.ok) return fail({ not_found: "لا يوجد مطعم مرتبط بحسابك", blocked: "المطعم محظور — تواصل مع الإدارة", billing_expired: "انتهت الفترة المجانية — جدّد اشتراكك" }[result.reason]);
+    const restaurant = result.restaurant;
 
     const bytes = new Uint8Array(await file.arrayBuffer());
     const isWebp = file.type === "image/webp";

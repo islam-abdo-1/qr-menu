@@ -311,15 +311,24 @@ export async function createOrderAction(
 
 /* ───────────────────── المالك (لوحة الإدارة) ───────────────────── */
 
+type OwnerRestaurantResult =
+  | { ok: true; restaurant: NonNullable<Awaited<ReturnType<typeof getOwnerRestaurant>>> }
+  | { ok: false; reason: "not_found" | "blocked" | "billing_expired" };
+
+async function requireOwnerRestaurantForOrders(): Promise<OwnerRestaurantResult> {
+  const restaurant = await getOwnerRestaurant();
+  if (!restaurant) return { ok: false, reason: "not_found" };
+  if (restaurant.blocked) return { ok: false, reason: "blocked" };
+  const billingEnabled = await getBillingEnabled();
+  if (isBillingExpired(getBillingInfo(restaurant, billingEnabled))) return { ok: false, reason: "billing_expired" };
+  return { ok: true, restaurant };
+}
+
 export async function getOrdersAction(params?: OrdersPaginationParams): Promise<ActionResult<OrderView[]>> {
   try {
-    const restaurant = await getOwnerRestaurant();
-    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
-    const billingEnabled = await getBillingEnabled();
-    if (isBillingExpired(getBillingInfo(restaurant, billingEnabled))) {
-      return fail("انتهت الفترة المجانية — جدّد اشتراكك");
-    }
-    return ok(await loadOrders(restaurant.id, params));
+    const result = await requireOwnerRestaurantForOrders();
+    if (!result.ok) return fail({ not_found: "لا يوجد مطعم مرتبط بحسابك", blocked: "المطعم محظور — تواصل مع الإدارة", billing_expired: "انتهت الفترة المجانية — جدّد اشتراكك" }[result.reason]);
+    return ok(await loadOrders(result.restaurant.id, params));
   } catch (e) {
     console.error("[orders] admin list failed:", e);
     return fail("تعذّر تحميل الطلبات");
@@ -332,12 +341,9 @@ export async function updateOrderStatusAction(
 ): Promise<ActionResult<null>> {
   if (!ORDER_STATUSES.includes(status)) return fail("حالة غير صالحة");
   try {
-    const restaurant = await getOwnerRestaurant();
-    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
-    const billingEnabled = await getBillingEnabled();
-    if (isBillingExpired(getBillingInfo(restaurant, billingEnabled))) {
-      return fail("انتهت الفترة المجانية — جدّد اشتراكك");
-    }
+    const result = await requireOwnerRestaurantForOrders();
+    if (!result.ok) return fail({ not_found: "لا يوجد مطعم مرتبط بحسابك", blocked: "المطعم محظور — تواصل مع الإدارة", billing_expired: "انتهت الفترة المجانية — جدّد اشتراكك" }[result.reason]);
+    const restaurant = result.restaurant;
 
     // تحديث واحد بشرط الملكية — يتحقق من وجود الطلب وانتمائه للمطعم معًا
     const res = await prisma.order.updateMany({

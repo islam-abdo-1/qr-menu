@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { credentialsSchema, signupSchema } from "@/lib/validations";
 import { ActionResult, fail, fromZod, ok } from "@/lib/actions/helpers";
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, unstable_cache } from "next/cache";
 import { generateUniqueStaffPin } from "@/lib/staff-pin";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { rateLimitIp } from "@/lib/rate-limit";
@@ -94,6 +94,46 @@ export async function signOutAction(): Promise<ActionResult<null>> {
   }
 }
 
+/* ───────────────────────── تغيير كلمة المرور (مسجل دخول) ───────────────────────── */
+
+export async function changePasswordAction(
+  currentPassword: string,
+  newPassword: string,
+): Promise<ActionResult<null>> {
+  const parsed = z
+    .object({
+      currentPassword: z.string().min(1, "أدخل كلمة المرور الحالية"),
+      newPassword: z.string().min(8, "كلمة المرور الجديدة 8 أحرف على الأقل").max(72, "كلمة المرور طويلة جداً"),
+    })
+    .safeParse({ currentPassword, newPassword });
+
+  if (!parsed.success) {
+    const { error, fieldErrors } = fromZod(parsed.error);
+    return fail(error, fieldErrors);
+  }
+
+  try {
+    const supabase = createClient();
+
+    // التحقق من كلمة المرور الحالية عبر محاولة تسجيل دخول
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: (await supabase.auth.getUser()).data.user?.email ?? "",
+      password: parsed.data.currentPassword,
+    });
+    if (signInError) return fail("كلمة المرور الحالية غير صحيحة");
+
+    // تحديث كلمة المرور
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: parsed.data.newPassword,
+    });
+    if (updateError) return fail(authErrorMessage(updateError.message));
+
+    return ok(null);
+  } catch {
+    return fail("تعذّر تغيير كلمة المرور — حاول لاحقًا");
+  }
+}
+
 /* ───────────────────────── استعادة كلمة المرور ───────────────────────── */
 
 /**
@@ -124,23 +164,21 @@ export async function requestPasswordResetAction(
 
 /* ───────────────────────── تسجيل مطعم جديد ───────────────────────── */
 
-let siteSettingsCache: { signupOpen: boolean; maxRestaurants: number } | null = null;
-let siteSettingsCacheTime = 0;
+const getSiteSettingsCached = unstable_cache(
+  async () => {
+    const rows = await prisma.siteSetting.findMany();
+    const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    return {
+      signupOpen: map.signupOpen !== "false",
+      maxRestaurants: Math.max(1, Number.parseInt(map.maxRestaurants ?? "25", 10) || 25),
+    };
+  },
+  ["site-settings"],
+  { tags: ["site-settings"], revalidate: 300 }
+);
 
 async function getSiteSettings() {
-  const now = Date.now();
-  // كاش لمدة 5 دقائق للإعدادات
-  if (siteSettingsCache && now - siteSettingsCacheTime < 5 * 60 * 1000) {
-    return siteSettingsCache;
-  }
-  const rows = await prisma.siteSetting.findMany();
-  const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-  siteSettingsCache = {
-    signupOpen: map.signupOpen !== "false",
-    maxRestaurants: Math.max(1, Number.parseInt(map.maxRestaurants ?? "25", 10) || 25),
-  };
-  siteSettingsCacheTime = now;
-  return siteSettingsCache;
+  return getSiteSettingsCached();
 }
 
 /** مطعم المالك من الجلسة — تُستخدم في لوحة الإدارة وكل إجراءات التعديل */

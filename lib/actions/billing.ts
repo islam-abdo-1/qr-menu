@@ -20,7 +20,8 @@ export async function subscribeAction(
   }
   try {
     const restaurant = await getOwnerRestaurant();
-    if (!restaurant) return fail("غير مصرح — أعد تسجيل الدخول");
+    if (!restaurant) return fail("لا يوجد مطعم مرتبط بحسابك");
+    if (restaurant.blocked) return fail("المطعم محظور — تواصل مع الإدارة");
     if (restaurant.billingExempt) return fail("حسابك مستثنى نهائيًا من الاشتراك");
 
     if (!isPaymobConfigured()) {
@@ -76,9 +77,8 @@ export async function getBillingStatusAction(): Promise<
 > {
   try {
     const restaurant = await getOwnerRestaurant();
-    if (!restaurant) {
-      return fail("غير مصرح — أعد تسجيل الدخول");
-    }
+    if (!restaurant) return fail("لا يوجد مطعم مرتبط بحسابك");
+    if (restaurant.blocked) return fail("المطعم محظور — تواصل مع الإدارة");
     const billingEnabled = await getBillingEnabled();
     const info = getBillingInfo(restaurant, billingEnabled);
     return ok({
