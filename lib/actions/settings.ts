@@ -6,7 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { imageUploadSchema, settingsSchema } from "@/lib/validations";
 import { fromZod, fail, ok, type ActionResult } from "@/lib/actions/helpers";
 import { getOwnerRestaurant } from "@/lib/data";
-import { uploadToCloudinary, deleteFromCloudinary } from "@/lib/cloudinary/upload";
+import { storageUpload, storagePublicUrl, storageDelete } from "@/lib/supabase/storage-rest";
+import { imagePathFromUrl } from "@/lib/supabase/storage";
 import { isOwnerBillingExpired } from "@/lib/billing";
 
 export async function updateSettingsAction(
@@ -26,11 +27,11 @@ export async function updateSettingsAction(
       where: { restaurantId: restaurant.id },
     });
 
-    // حذف الشعار القديم من Cloudinary عند استبداله أو إزالته
-    if (existing?.logoPublicId) {
+    // حذف الشعار القديم من التخزين عند استبداله أو إزالته
+    if (existing?.logoUrl) {
       const newLogo = parsed.data.logoUrl || null;
-      if (newLogo === null) {
-        await deleteFromCloudinary(existing.logoPublicId);
+      if (newLogo === null || imagePathFromUrl(existing.logoUrl) !== imagePathFromUrl(newLogo)) {
+        await storageDelete([imagePathFromUrl(existing.logoUrl)]);
       }
     }
 
@@ -39,14 +40,6 @@ export async function updateSettingsAction(
     } else {
       await prisma.setting.create({
         data: { ...parsed.data, restaurantId: restaurant.id },
-      });
-    }
-    
-    // تحديث logoPublicId إذا تم رفع شعار جديد
-    if (parsed.data.logoUrl && existing?.logoPublicId !== parsed.data.logoPublicId) {
-      await prisma.setting.update({
-        where: { restaurantId: restaurant.id },
-        data: { logoPublicId: parsed.data.logoPublicId }
       });
     }
     // مزامنة اسم المطعم في السجل الرسمي حتى لا يتباعد الاسم بين الشاشات
@@ -62,14 +55,14 @@ export async function updateSettingsAction(
   }
 }
 
-/** رفع شعار المطعم إلى Cloudinary (يُعرض في الهيرو والفوتر بإطار ذهبي) */
+/** رفع شعار المطعم إلى التخزين (يُعرض في الهيرو والفوتر بإطار ذهبي) */
 export async function uploadLogoImageAction(
   formData: FormData,
-): Promise<ActionResult<{ url: string; width: number; height: number; sizeKB: number; publicId: string }>> {
+): Promise<ActionResult<{ url: string; width: number; height: number; sizeKB: number }>> {
   // قراءة البيانات الوصفية المرسلة من العميل (عرض، ارتفاع، حجم بالكيلوبايت)
-  const _width = Number(formData.get("width") ?? "0");
-  const _height = Number(formData.get("height") ?? "0");
-  const _sizeKB = Number(formData.get("sizeKB") ?? "0");
+  const width = Number(formData.get("width") ?? "0");
+  const height = Number(formData.get("height") ?? "0");
+  const sizeKB = Number(formData.get("sizeKB") ?? "0");
 
   const file = formData.get("file");
   if (!(file instanceof File)) return fail("لم يتم اختيار صورة");
@@ -86,29 +79,18 @@ export async function uploadLogoImageAction(
 
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const _isWebp = file.type === "image/webp";
-
-    const uploadResult = await uploadToCloudinary({
-      folder: `qr-menu/logos`,
-      transformation: [
-        { quality: 'auto', fetch_format: 'auto' },
-        { width: 400, height: 400, crop: 'fill', gravity: 'face' }
-      ],
-      buffer: Buffer.from(bytes),
-    });
-
+    const isWebp = file.type === "image/webp";
+    const path = `logo/${crypto.randomUUID()}.${isWebp ? "webp" : "jpg"}`;
+    const uploadResult = await storageUpload(path, bytes, isWebp ? "image/webp" : "image/jpeg");
     if (!uploadResult.ok) {
       console.error("[logo upload]", uploadResult.error);
-      return fail("فشل رفع الشعار إلى Cloudinary");
+      return fail(
+        uploadResult.error!.includes("permission")
+          ? "لا تملك صلاحية الرفع — تحقق من سياسات التخزين"
+          : "فشل رفع الشعار إلى التخزين",
+      );
     }
-
-    return ok({ 
-      url: uploadResult.data!.url, 
-      width: uploadResult.data!.width, 
-      height: uploadResult.data!.height, 
-      sizeKB: uploadResult.data!.sizeKB,
-      publicId: uploadResult.data!.publicId
-    });
+    return ok({ url: storagePublicUrl(path), width, height, sizeKB });
   } catch (e) {
     console.error("[logo upload]", e);
     return fail("فشل رفع الشعار");

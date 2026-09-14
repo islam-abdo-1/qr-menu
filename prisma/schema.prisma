@@ -91,7 +91,6 @@ model Setting {
   currency         String     @default("EGP")
   themePrimary     String     @default("#C84C21")
   logoUrl          String?    @default("")
-  logoPublicId     String?    // Cloudinary public ID for easy deletion
   logoWidth        Int?
   logoHeight       Int?
   logoSizeKB       Int?
@@ -120,7 +119,6 @@ model MenuItem {
   price              Float
   discountPercentage Int? // 0-100 — null/0 = لا خصم
   imageUrl           String?
-  imagePublicId      String?          // Cloudinary public ID for easy deletion
   imageWidth         Int? // بيانات تعريف الصورة المضغوطة — تُحسب أثناء الرفع (URL فقط يبقى في العمود أعلاه)
   imageHeight        Int?
   imageSizeKB        Int?
@@ -134,7 +132,6 @@ model MenuItem {
 
   @@index([restaurantId])
   @@index([categoryId])
-  @@index([imagePublicId])
 }
 
 /// مقاس محدد لصنف (حرفي S/M/L أو وزني مثل «ربع كيلو»/«كيلو ونص») بسعر خاص به — يُستخدم عند الطلب
