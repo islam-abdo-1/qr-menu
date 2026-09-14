@@ -233,7 +233,9 @@ export async function updateMenuItemAction(
     const oldImage = existing.imageUrl ? imagePathFromUrl(existing.imageUrl) : null;
     const newImage = parsed.data.imageUrl ? imagePathFromUrl(parsed.data.imageUrl) : null;
     if (oldImage && newImage && oldImage !== newImage) {
-      await storageDelete([oldImage]);
+      storageDelete([oldImage]).catch((e) =>
+        console.error("[updateMenuItemAction] background image delete failed:", e)
+      );
     }
 
     await prisma.menuItem.update({
@@ -270,12 +272,17 @@ export async function deleteMenuItemAction(id: string): Promise<ActionResult<nul
     const existing = await prisma.menuItem.findUnique({ where: { id } });
     if (!existing || existing.restaurantId !== restaurant.id) return fail("العنصر غير موجود");
 
-    if (existing.imageUrl) {
-      await storageDelete([imagePathFromUrl(existing.imageUrl)]);
-    }
-
+    // احذف من قاعدة البيانات فوراً — لا تنتظر حذف الصورة
     await prisma.menuItem.delete({ where: { id } });
     bumpMenuCache();
+
+    // حذف الصورة في الخلفية (لا يعطل الاستجابة)
+    if (existing.imageUrl) {
+      storageDelete([imagePathFromUrl(existing.imageUrl)]).catch((e) =>
+        console.error("[deleteMenuItemAction] background image delete failed:", e)
+      );
+    }
+
     return ok(null);
   } catch (e) {
     return diskError(e);
