@@ -4,15 +4,14 @@ import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { categorySchema, imageUploadSchema, menuItemSchema } from "@/lib/validations";
 import { fromZod, fail, ok, type ActionResult } from "@/lib/actions/helpers";
-import { getOwnerRestaurant } from "@/lib/data";
+import { getOwnerRestaurant, MENU_TAG, OWNER_TAG } from "@/lib/data";
 import { storageUpload, storagePublicUrl, storageDelete } from "@/lib/supabase/storage-rest";
 import { imagePathFromUrl } from "@/lib/supabase/storage";
 import { getBillingEnabled, getBillingInfo, isBillingExpired } from "@/lib/billing";
 
-const TAG = "menu";
-
 function bumpMenuCache() {
-  revalidateTag(TAG);
+  revalidateTag(MENU_TAG);
+  revalidateTag(OWNER_TAG);
 }
 
 function diskError(e: unknown) {
