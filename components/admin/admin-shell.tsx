@@ -149,7 +149,6 @@ export function AdminShell({ data }: { data: AdminData }) {
   }
 
   const onChanged = () => {
-    router.refresh();
     pollOrders();
   };
 
